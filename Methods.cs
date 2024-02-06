@@ -1,10 +1,19 @@
-﻿using Npgsql;
+﻿using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Npgsql;
+using RestSharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Runtime.Caching;
 using System.Text;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -19,7 +28,14 @@ namespace StaffCommunity
         static CacheItemPolicy policyuser = new CacheItemPolicy() { SlidingExpiration = TimeSpan.Zero, AbsoluteExpiration = DateTimeOffset.Now.AddMinutes(10) };
 
         //public static NpgsqlConnection conn = new NpgsqlConnection("Server = localhost; Port = 5432; User Id = postgres; Password = e4r5t6; Database = sae");
-        public static NpgsqlConnection conn = new NpgsqlConnection("Server = localhost; Port = 5432; User Id = postgres; Password = OVBtoBAX1972; Database = sae");
+        //public static NpgsqlConnection conn = new NpgsqlConnection("Server = localhost; Port = 5432; User Id = postgres; Password = OVBtoBAX1972; Database = sae");
+        public static NpgsqlConnection conn = new NpgsqlConnection(Properties.Settings.Default.ConnectionString);
+
+        const string username = "sae2";
+        const string pwd = "ISTbetweenVAR1999";
+
+        const string SERVER_API_KEY_NEW = "AAAAmhjFn8k:APA91bGQ93j58UPBa_dZ2pkSHP7FPA97Cv9D4i0UqHEGi1__pIm4faBPhL7KcQcUDj-YqxpZMyL-kDwJHpeDddA_GNLPcWRQ4u7T5JsuOafpqq8te3Eg32T6zTpGGbZQSVlW6faSwaKM";
+        const string SENDER_ID_NEW = "661840568265";
 
         public static telegram_user ProfileCommand(long id, string strtoken, EventLog eventLogBot, telegram_user user, out string message)
         {
@@ -54,11 +70,10 @@ namespace StaffCommunity
                             reader.Dispose();
                             com.Dispose();
 
-                            NpgsqlCommand com3 = new NpgsqlCommand("update telegram_user set is_reporter=@is_reporter, type=@type, id_user=@id_user where id=@id", conn);
+                            NpgsqlCommand com3 = new NpgsqlCommand("update telegram_user set is_reporter=@is_reporter, id_user=@id_user where id=@id", conn);
                             com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
                             com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = true });
-                            com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "type", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Smallint, Value = token.type });
-                            com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = token.id_user });
+                            com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = token.type + "_" + token.id_user });
 
                             eventLogBot.WriteEntry(com3.CommandText);
 
@@ -78,14 +93,13 @@ namespace StaffCommunity
                             reader.Dispose();
                             com.Dispose();
 
-                            NpgsqlCommand com2 = new NpgsqlCommand("insert into telegram_user (id, first_use, own_ac, is_reporter, is_requestor, type, id_user) values (@id, @first_use, @own_ac, @is_reporter, @is_requestor, @type, @id_user)", conn);
+                            NpgsqlCommand com2 = new NpgsqlCommand("insert into telegram_user (id, first_use, own_ac, is_reporter, is_requestor, id_user) values (@id, @first_use, @own_ac, @is_reporter, @is_requestor, @id_user)", conn);
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "first_use", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Timestamp, Value = DateTime.Now });
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "own_ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = "??" });
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = true });
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_requestor", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = false });
-                            com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "type", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Smallint, Value = token.type });
-                            com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = token.id_user });
+                            com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = token.type + " " + token.id_user });
 
                             eventLogBot.WriteEntry(com2.CommandText);
 
@@ -146,9 +160,8 @@ namespace StaffCommunity
 
         public static bool TokenAlreadySet(sign_in token, long telegram_user)
         {
-            NpgsqlCommand com = new NpgsqlCommand("select count(*) from telegram_user where id<>@id and type=@type and id_user=@id_user", conn);
+            NpgsqlCommand com = new NpgsqlCommand("select count(*) from telegram_user where id<>@id and id_user=@id_user", conn);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = telegram_user });
-            com.Parameters.Add(new NpgsqlParameter() { ParameterName = "type", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Smallint, Value = token.type });
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = token.id_user });
             var o = com.ExecuteScalar();
             //var cnt = (int)com.ExecuteScalar();
@@ -304,20 +317,49 @@ namespace StaffCommunity
             }
         }
 
-        public static void UpdateUserAC(long id, string ac)
+        public static void UpdateUserAC(long id, string ac, string current_ac)
         {
             NpgsqlCommand com = new NpgsqlCommand("update telegram_user set own_ac=@own_ac where id=@id", conn);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "own_ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = ac });
-            try
-            {
-                com.ExecuteNonQuery();
-            }
-            catch (Exception ex)
-            {
-                string s = "123";
-            }
+            com.ExecuteNonQuery();
             com.Dispose();
+
+            if (current_ac.Length == 2 && current_ac != ac && !string.IsNullOrEmpty(ac))
+            {
+                com = new NpgsqlCommand("select count(*) from telegram_user where is_reporter=true and own_ac=@ac and id<>@id", conn);
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = current_ac });
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
+                var cnt = Convert.ToInt32(com.ExecuteScalar());
+                com.Dispose();
+
+                if (cnt == 0)
+                {
+                    com = new NpgsqlCommand("update airlines set reporter=false where code=@ac", conn);
+                    com.Parameters.Add(new NpgsqlParameter() { ParameterName = "ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = current_ac });
+                    com.ExecuteNonQuery();
+                    com.Dispose();
+
+                    // отправляем событие «change reporters for ac» в амплитуд
+                    string DataJson2 = "[{\"event_type\":\"change reporters for ac\"," +
+                        "\"event_properties\":{\"ac\":\"" + current_ac + "\"," +
+                        "\"new_status\":\"false\"}}]";
+                    var task2 = Task.Run(async () => await AmplitudePOST(DataJson2));
+                    var r2 = task2.Result;
+                }
+            }
+
+            com = new NpgsqlCommand("update airlines set reporter=true where code=@ac", conn);
+            com.Parameters.Add(new NpgsqlParameter() { ParameterName = "ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = ac });
+            com.ExecuteNonQuery();
+            com.Dispose();
+
+            // отправляем событие «change reporters for ac» в амплитуд
+            string DataJson = "[{\"event_type\":\"change reporters for ac\"," +
+                "\"event_properties\":{\"ac\":\"" + ac + "\"," +
+                "\"new_status\":\"false\"}}]";
+            var task = Task.Run(async () => await AmplitudePOST(DataJson));
+            var r = task.Result;
         }
 
         public static void UpdateUserInCache(telegram_user user)
@@ -339,10 +381,10 @@ namespace StaffCommunity
                     string time_flight = reader["time_flight"].ToString();
                     string Id_reporter = reader["id_reporter"].ToString();
                     DateTime DepartureDateTime = new DateTime(int.Parse(date_flight.Substring(4, 2)) + 2000, int.Parse(date_flight.Substring(2, 2)), int.Parse(date_flight.Substring(0, 2)), int.Parse(time_flight.Substring(0, 2)), int.Parse(time_flight.Substring(2, 2)), 0);
-                    Request request = new Request() { Id = (long)reader["id"], Id_requestor = (long)reader["id_requestor"], Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString() };
+                    Request request = new Request() { Id = (long)reader["id"], Id_requestor = reader["id_requestor"].ToString(), Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString() };
                     if (!string.IsNullOrEmpty(Id_reporter))
                     {
-                        request.Id_reporter = long.Parse(Id_reporter);
+                        request.Id_reporter = Id_reporter;
                     }
 
                     result.Add(request);
@@ -366,10 +408,10 @@ namespace StaffCommunity
                     string time_flight = reader["time_flight"].ToString();
                     string Id_reporter = reader["id_reporter"].ToString();
                     DateTime DepartureDateTime = new DateTime(int.Parse(date_flight.Substring(4, 2)) + 2000, int.Parse(date_flight.Substring(2, 2)), int.Parse(date_flight.Substring(0, 2)), int.Parse(time_flight.Substring(0, 2)), int.Parse(time_flight.Substring(2, 2)), 0);
-                    Request request = new Request() { Id = (long)reader["id"], Id_requestor = (long)reader["id_requestor"], Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString() };
+                    Request request = new Request() { Id = (long)reader["id"], Id_requestor = reader["id_requestor"].ToString(), Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString() };
                     if (!string.IsNullOrEmpty(Id_reporter))
                     {
-                        request.Id_reporter = long.Parse(Id_reporter);
+                        request.Id_reporter = Id_reporter;
                     }
 
                     result.Add(request);
@@ -380,12 +422,12 @@ namespace StaffCommunity
             return result;
         }
 
-        public static void SetRequestStatus(short status, long id, long id_reporter)
+        public static void SetRequestStatus(short status, long id, string id_reporter)
         {
             NpgsqlCommand com = new NpgsqlCommand("update telegram_request set request_status=@status, id_reporter=@id_reporter, ts_change=now() where id=@id", conn);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "status", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Smallint, Value = status });
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
-            com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id_reporter });
+            com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = id_reporter });
             com.ExecuteNonQuery();
             com.Dispose();
         }
@@ -415,12 +457,18 @@ namespace StaffCommunity
         public static Request GetRequestStatus(long id)
         {
             Request result = new Request();
-            NpgsqlCommand com = new NpgsqlCommand("select request_status, economy_count, business_count, sa_count, desc_flight from telegram_request where id=@id", conn);
+            NpgsqlCommand com = new NpgsqlCommand("select origin, destination, number_flight, date_flight, time_flight, request_status, economy_count, business_count, sa_count, desc_flight, source, push_id from telegram_request where id=@id", conn);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
             using (NpgsqlDataReader reader = com.ExecuteReader())
             {
                 if (reader.Read())
                 {
+                    result.Origin = reader["origin"].ToString();
+                    result.Destination = reader["destination"].ToString();
+                    result.Number_flight = reader["number_flight"].ToString();
+                    var datef = reader["date_flight"].ToString();
+                    var timef = reader["time_flight"].ToString();
+                    result.DepartureDateTime = new DateTime(2000 + int.Parse(datef.Substring(4)), int.Parse(datef.Substring(2, 2)), int.Parse(datef.Substring(0, 2)), int.Parse(timef.Substring(0, 2)), int.Parse(timef.Substring(2)), 0);
                     result.Request_status = (short)reader["request_status"];
                     var ec = reader["economy_count"].ToString();
                     var eb = reader["business_count"].ToString();
@@ -430,6 +478,8 @@ namespace StaffCommunity
                     if (es != "") result.SA_count = int.Parse(es);
 
                     result.Desc_fligth = reader["desc_flight"].ToString();
+                    result.Source = short.Parse(reader["source"].ToString());
+                    result.Push_id = reader["push_id"].ToString();
                 }
             }
             com.Dispose();
@@ -437,10 +487,10 @@ namespace StaffCommunity
             return result;
         }
 
-        public static bool TakeAvailable(long id)
+        public static bool TakeAvailable(string id_user)
         {
-            NpgsqlCommand com = new NpgsqlCommand("select count(*) from telegram_request where id_reporter=@id and request_status in (2, 4)", conn);
-            com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
+            NpgsqlCommand com = new NpgsqlCommand("select count(*) from telegram_request where id_reporter=@id_user and request_status in (2, 4)", conn);
+            com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = id_user });
             var cnt = (long)com.ExecuteScalar();
             com.Dispose();
             if (cnt == 0) return true;
@@ -506,6 +556,126 @@ namespace StaffCommunity
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "request_id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = request_id });
             com.ExecuteNonQuery();
             com.Dispose();
+        }
+
+        // настройка клиента
+        private static HttpClient GetClient()
+        {
+            HttpClientHandler handler = new HttpClientHandler() { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate };
+
+            HttpClient client = new HttpClient(handler);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.DefaultRequestHeaders.Add("ngrok-skip-browser-warning", "1233");
+
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue(
+                    "Basic", Convert.ToBase64String(
+                        System.Text.ASCIIEncoding.ASCII.GetBytes(
+                           $"{username}:{pwd}")));
+            return client;
+        }
+
+        public static async Task<string> AmplitudePOST(string Data)
+        {
+            string result = null;
+            var client = new RestClient("https://api.amplitude.com/httpapi");
+            var request = new RestRequest((string)null, Method.Post);
+            request.AddHeader("content-type", "application/x-www-form-urlencoded");
+            request.AddParameter("api_key", "95be547554caecf51c57c691bafb2640");
+            request.AddParameter("event", Data);
+            await client.ExecuteAsync(request).ContinueWith(t => { result = t.Result.Content; });
+            return result;
+        }
+
+        public static string SendPushNotification(string applicationID, string senderId, string deviceId, string title, string message)
+        {
+            string result = "";
+            try
+            {
+                string Alert = "Отправка пуша: " + message;
+                result += Alert + " ";
+
+                WebRequest tRequest = WebRequest.Create("https://fcm.googleapis.com/fcm/send");
+                tRequest.Method = "post";
+                tRequest.ContentType = "application/json";
+                var data = new
+                {
+                    to = deviceId,
+                    priority = "high",
+                    notification = new
+                    {
+                        title = title,
+                        body = message,
+                        sound = "Enabled"
+                    }
+                };
+
+                string json = JsonConvert.SerializeObject(data);
+                Byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(json);
+                tRequest.Headers.Add(string.Format("Authorization: key={0}", applicationID));
+                tRequest.Headers.Add(string.Format("Sender: id={0}", senderId));
+                tRequest.ContentLength = byteArray.Length;
+
+                using (Stream dataStream = tRequest.GetRequestStream())
+                {
+                    dataStream.Write(byteArray, 0, byteArray.Length);
+                    using (WebResponse tResponse = tRequest.GetResponse())
+                    {
+                        using (Stream dataStreamResponse = tResponse.GetResponseStream())
+                        {
+                            using (StreamReader tReader = new StreamReader(dataStreamResponse))
+                            {
+                                string sResponseFromServer = tReader.ReadToEnd();
+                                //string str = sResponseFromServer;
+
+                                string Alert2 = "ResponseFromServer: " + sResponseFromServer;
+                                result += Alert2 + " ";
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                string Alert = message + " - " + ex.Message + "..." + ex.StackTrace;
+                result += Alert;
+            }
+            return result;
+        }
+
+        public static string PushStatusRequest(Request req, string status)
+        {
+            string title = req.Number_flight + " " + status;
+            string message = status + ": " + req.Number_flight + " " + req.Origin + "-" + req.Destination + " " + req.DepartureDateTime.ToString("dd-MM-yyyy HH:mm");
+            if (status == "Processing is finished")
+            {
+                message += Environment.NewLine + "Economy class: " + req.Economy_count.Value + " seats" + Environment.NewLine + "Business class: " + req.Business_count.Value + " seats" + Environment.NewLine + "SA passengers: " + req.SA_count.Value;
+            }
+            string result = SendPushNotification(SERVER_API_KEY_NEW, SENDER_ID_NEW, req.Push_id, title, message);
+            return result;
+        }
+
+        public static async Task<TokenCollection> CredToken(string id_user)
+        {
+            try
+            {
+                using (HttpClient client = GetClient())
+                {
+                    string Uri = Properties.Settings.Default.UrlApi + "/token/CredToken?id_user=" + id_user + "&type=oper&operation=reward&amount=0";
+                    var response = await client.GetAsync(Uri);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string json = await response.Content.ReadAsStringAsync();
+                        TokenCollection result = JsonConvert.DeserializeObject<TokenCollection>(json);
+                        return result;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return new TokenCollection() { Error = ex.Message + "..." + ex.StackTrace };
+            }
+            return new TokenCollection();
         }
     }
 }

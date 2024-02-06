@@ -1,0 +1,12 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="StaffCommunity.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="ConnectionString" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Server = localhost; Port = 5432; User Id = postgres; Password = e4r5t6; Database = sae</Value>
+    </Setting>
+    <Setting Name="UrlApi" Type="System.String" Scope="User">
+      <Value Profile="(Default)">http://dev-api.staffairlines.com:8033/api</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>

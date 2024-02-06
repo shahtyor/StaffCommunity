@@ -212,8 +212,8 @@ namespace StaffCommunity
     public class Request
     {
         public long Id { get; set; }
-        public long Id_requestor { get; set; }
-        public long? Id_reporter { get; set; }
+        public string Id_requestor { get; set; }
+        public string Id_reporter { get; set; }
         public short Request_status { get; set; }
         public string Origin { get; set; }
         public string Destination { get; set; }
@@ -223,11 +223,22 @@ namespace StaffCommunity
         public int? Economy_count { get; set; }
         public int? Business_count { get; set; }
         public int? SA_count { get; set; }
+        public short Source { get; set; }
+        public string Push_id { get; set; }
     }
 
     public class TelMessage
     {
         public long ChatId { get; set; }
         public int MessageId { get; set; }
+    }
+
+    public class TokenCollection
+    {
+        public int SubscribeTokens { get; set; }
+        public int NonSubscribeTokens { get; set; }
+        public int DebtSubscribeTokens { get; set; }
+        public int DebtNonSubscribeTokens { get; set; }
+        public string Error { get; set; }
     }
 }
