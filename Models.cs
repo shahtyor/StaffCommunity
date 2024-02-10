@@ -5,7 +5,7 @@ namespace StaffCommunity
 {
     public class telegram_user
     {
-        public long id { get; set; }
+        public long? id { get; set; }
         public DateTime first_use { get; set; }
         public string own_ac { get; set; }
         public bool is_reporter { get; set; }
@@ -225,6 +225,14 @@ namespace StaffCommunity
         public int? SA_count { get; set; }
         public short Source { get; set; }
         public string Push_id { get; set; }
+        public int SubscribeTokens { get; set; }
+        public int PaidTokens { get; set; }
+    }
+
+    public class RequestType
+    {
+        public Request Req { get; set; }
+        public short Type { get; set; }
     }
 
     public class TelMessage

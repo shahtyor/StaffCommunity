@@ -46,3 +46,5 @@ F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCommunity.exe
 F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCommunity.pdb
 F:\StaffCommunity\StaffCommunity\bin\Debug\RestSharp.dll
 F:\StaffCommunity\StaffCommunity\bin\Debug\RestSharp.xml
+F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Extensions.DependencyInjection.Abstractions.xml

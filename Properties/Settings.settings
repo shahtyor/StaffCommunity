@@ -8,5 +8,17 @@
     <Setting Name="UrlApi" Type="System.String" Scope="User">
       <Value Profile="(Default)">http://dev-api.staffairlines.com:8033/api</Value>
     </Setting>
+    <Setting Name="BotToken" Type="System.String" Scope="User">
+      <Value Profile="(Default)">6457417713:AAFrqt3BSYdQy3-w73SAXKvrMXGy8btoJ0E</Value>
+    </Setting>
+    <Setting Name="TimeoutProcess" Type="System.String" Scope="User">
+      <Value Profile="(Default)">5</Value>
+    </Setting>
+    <Setting Name="TimeoutVoid" Type="System.String" Scope="User">
+      <Value Profile="(Default)">15</Value>
+    </Setting>
+    <Setting Name="BotSearchToken" Type="System.String" Scope="User">
+      <Value Profile="(Default)">6906986784:AAGWHhFXFQ3YVyu_c0fdJ1v13Pwsn5nbmBg</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

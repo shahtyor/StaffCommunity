@@ -16,7 +16,11 @@ namespace StaffCommunity
 {
     public partial class StaffCommunityBot : ServiceBase
     {
-        static ITelegramBotClient bot = new TelegramBotClient("6636694790:AAGzuH6T3wmsD27KU0cU5BoAuesvsOX7hqA");
+        //static ITelegramBotClient bot = new TelegramBotClient("6636694790:AAGzuH6T3wmsD27KU0cU5BoAuesvsOX7hqA");
+        static ITelegramBotClient bot = new TelegramBotClient(Properties.Settings.Default.BotToken);
+        static ITelegramBotClient botSearch = new TelegramBotClient(Properties.Settings.Default.BotSearchToken);
+        //TestStaffCommunityBot 6457417713:AAFrqt3BSYdQy3-w73SAXKvrMXGy8btoJ0E
+        //TestStaffSearchBot 6906986784:AAGWHhFXFQ3YVyu_c0fdJ1v13Pwsn5nbmBg
         static ObjectCache cache = MemoryCache.Default;
         static CacheItemPolicy policyuser = new CacheItemPolicy() { SlidingExpiration = TimeSpan.Zero, AbsoluteExpiration = DateTimeOffset.Now.AddMinutes(10) };
 
@@ -74,6 +78,13 @@ namespace StaffCommunity
 
                 eventLogBot.WriteEntry("Staff Community Bot --- OnStart");
 
+                // Update the service state to Running.
+                serviceStatus.dwCurrentState = ServiceState.SERVICE_RUNNING;
+                SetServiceStatus(this.ServiceHandle, ref serviceStatus);
+
+                var s = bot.GetMeAsync().Result.FirstName;
+                eventLogBot.WriteEntry("Запущен бот " + bot.GetMeAsync().Result.FirstName);
+
                 System.Timers.Timer aTimer = new System.Timers.Timer();
 
                 aTimer.Elapsed += new ElapsedEventHandler(this.OnTimedEvent);
@@ -81,13 +92,6 @@ namespace StaffCommunity
                 aTimer.Interval = 60000;
                 aTimer.Enabled = true;
                 aTimer.Start();
-
-                // Update the service state to Running.
-                serviceStatus.dwCurrentState = ServiceState.SERVICE_RUNNING;
-                SetServiceStatus(this.ServiceHandle, ref serviceStatus);
-
-                var s = bot.GetMeAsync().Result.FirstName;
-                eventLogBot.WriteEntry("Запущен бот " + bot.GetMeAsync().Result.FirstName);
 
                 var cts = new CancellationTokenSource();
                 var cancellationToken = cts.Token;
@@ -114,7 +118,7 @@ namespace StaffCommunity
             try
             {
                 var task = Task.Run(async () => await Processing());
-           }
+            }
             catch (Exception ex) 
             {
                 eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace);
@@ -127,12 +131,63 @@ namespace StaffCommunity
 
             try
             {
-                var forcancel = Methods.SearchRequestsForCancel();
+                var forcancel = Methods.SearchRequestsForCancel(1);
                 foreach (var req in forcancel)
                 {
+                    // Сообщение репортеру
+                    var urep = Methods.GetUser(req.Id_reporter);
+
+                    // Убираем сообщение с ready/cancel
+                    var mespar = Methods.GetMessageParameters(req.Id, 1);
+                    foreach (var tm in mespar)
+                    {
+                        await bot.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
+                    }
+                    Methods.DelMessageParameters(req.Id, 1);
+
                     Methods.SetRequestStatus(3, req.Id);
-                    eventLogBot.WriteEntry("auto cancel request id=" + req.Id);
-                    await bot.SendTextMessageAsync(new ChatId(req.Id_reporter), "Request processing canceled!");
+                    eventLogBot.WriteEntry("auto cancel1 request id=" + req.Id);
+                    await bot.SendTextMessageAsync(new ChatId(urep.id.Value), "You did not respond in the allotted time!");
+
+                    // Сообщение реквестору
+                    if (req.Source == 0)
+                    {
+                        var u = Methods.GetUser(req.Id_requestor);
+                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "The reporter did not respond in the allotted time!");
+                    }
+                    else
+                    {
+                        var res = Methods.PushStatusRequest(req, "The reporter did not respond in the allotted time to your request " + req.Number_flight + " " + req.Origin + "-" + req.Destination + " at " + req.DepartureDateTime.ToString("dd-MM-yyyy HH:m") + "!");
+                        eventLogBot.WriteEntry("Timeout. " + res);
+                    }
+                }
+
+                var forvoid = Methods.SearchRequestsForCancel(2);
+                foreach (var req in forvoid)
+                {
+                    // Убираем сообщение с take
+                    var mespar = Methods.GetMessageParameters(req.Id, 0);
+                    foreach (var tm in mespar)
+                    {
+                        await bot.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
+                    }
+                    Methods.DelMessageParameters(req.Id, 0);
+
+                    Methods.SetRequestStatus(6, req.Id);
+                    var rt = await Methods.ReturnToken(req);
+                    eventLogBot.WriteEntry("auto cancel2 request id=" + req.Id + " Return token. " + Newtonsoft.Json.JsonConvert.SerializeObject(rt));
+
+                    // Сообщение реквестору
+                    if (req.Source == 0)
+                    {
+                        var u = Methods.GetUser(req.Id_requestor);
+                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "Request processing timeout! " + Environment.NewLine + "Возвращено токенов: Subscribe - " + rt.DebtSubscribeTokens + ", Paid - " + rt.DebtNonSubscribeTokens + ". В наличии: Subscribe - " + rt.SubscribeTokens + ", Paid - " + rt.NonSubscribeTokens);
+                    }
+                    else
+                    {
+                        var res = Methods.PushStatusRequest(req, "Request processing timeout!");
+                        eventLogBot.WriteEntry("Timeout. " + res);
+                    }
                 }
 
                 var requests = Methods.SearchRequests();
@@ -143,11 +198,11 @@ namespace StaffCommunity
 
                     var ikm = new InlineKeyboardMarkup(new[]
                     {
-                    new[]
-                    {
-                        InlineKeyboardButton.WithCallbackData("Take request", "/take " + req.Id),
-                    },
-                });
+                        new[]
+                        {
+                            InlineKeyboardButton.WithCallbackData("Take request", "/take " + req.Id),
+                        },
+                    });
 
                     eventLogBot.WriteEntry("Show request id=" + req.Id);
 
@@ -170,6 +225,8 @@ namespace StaffCommunity
 
         public static async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
+            eventLogBot.WriteEntry(Newtonsoft.Json.JsonConvert.SerializeObject(update));
+
             try
             {
                 if (update.Type == Telegram.Bot.Types.Enums.UpdateType.Message)
@@ -187,9 +244,14 @@ namespace StaffCommunity
                         keyuser = "teluser:" + userid;
                         var userexist = cache.Contains(keyuser);
                         if (userexist) user = (telegram_user)cache.Get(keyuser);
+                        else
+                        {
+                            user = Methods.GetUser(userid.Value);
+                            cache.Add(keyuser, user, policyuser);
+                        }
                     }
 
-                    eventLogBot.WriteEntry("key:User=" + userid.Value);
+                    //eventLogBot.WriteEntry("key:User=" + userid.Value);
 
                     /*string commready = "";
                     var readyexist = cache.Contains("Ready" + userid.Value);
@@ -235,6 +297,8 @@ namespace StaffCommunity
                         string comm = "";
                         var commexist = cache.Contains("User" + userid.Value);
                         if (commexist) comm = (string)cache.Get("User" + userid.Value);
+
+                        eventLogBot.WriteEntry("comm: " + comm);
 
                         if (comm == "entertoken" && !string.IsNullOrEmpty(message.Text))
                         {
@@ -322,7 +386,7 @@ namespace StaffCommunity
                             return;
                         }
 
-                        eventLogBot.WriteEntry("command=" + comm + ", chat=" + message.Chat.Id);
+                        //eventLogBot.WriteEntry("command=" + comm + ", chat=" + message.Chat.Id);
 
                         if (!string.IsNullOrEmpty(comm))
                         {
@@ -394,12 +458,17 @@ namespace StaffCommunity
                                     eventLogBot.WriteEntry("finished request id=" + id_req);
                                     Methods.DelMessageParameters(id_req);
 
-                                    await botClient.SendTextMessageAsync(message.Chat, "Processing is finished!" + Environment.NewLine + Environment.NewLine + req.Desc_fligth + Environment.NewLine + Environment.NewLine + "Economy class: " + req.Economy_count.Value + " seats" + Environment.NewLine + "Business class: " + req.Business_count.Value + " seats" + Environment.NewLine + "SA passengers: " + req.SA_count.Value, null, Telegram.Bot.Types.Enums.ParseMode.Html);
+                                    await botClient.SendTextMessageAsync(message.Chat, "Processing is finished!" + Environment.NewLine + Environment.NewLine + req.Desc_fligth + Environment.NewLine + "Economy class: " + req.Economy_count.Value + " seats" + Environment.NewLine + "Business class: " + req.Business_count.Value + " seats" + Environment.NewLine + "SA passengers: " + req.SA_count.Value, null, Telegram.Bot.Types.Enums.ParseMode.Html);
 
                                     if (req.Source == 1)
                                     {
                                         var res = Methods.PushStatusRequest(req, "Processing is finished");
                                         eventLogBot.WriteEntry("Push. " + res);
+                                    }
+                                    else
+                                    {
+                                        var u = Methods.GetUser(req.Id_requestor);
+                                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), req.Desc_fligth + Environment.NewLine + "Economy class: " + req.Economy_count.Value + " seats" + Environment.NewLine + "Business class: " + req.Business_count.Value + " seats" + Environment.NewLine + "SA passengers: " + req.SA_count.Value + Environment.NewLine + Environment.NewLine + "Processing is finished!", null, Telegram.Bot.Types.Enums.ParseMode.Html);
                                     }
 
                                     var Coll = await Methods.CredToken(CombineUserId(user));
@@ -445,6 +514,11 @@ namespace StaffCommunity
                             string keyuser = "teluser:" + userid;
                             var userexist = cache.Contains(keyuser);
                             if (userexist) user = (telegram_user)cache.Get(keyuser);
+                            else
+                            {
+                                user = Methods.GetUser(userid.Value);
+                                cache.Add(keyuser, user, policyuser);
+                            }
                         }
 
                         eventLogBot.WriteEntry(message + "..." + message.Substring(0, 5));
@@ -535,6 +609,12 @@ namespace StaffCommunity
                                             var res = Methods.PushStatusRequest(request, "Taken to work");
                                             eventLogBot.WriteEntry("Push. " + res);
                                         }
+                                        else
+                                        {
+                                            var u = Methods.GetUser(request.Id_requestor);
+                                            eventLogBot.WriteEntry("GetUser. Id_requestor=" + request.Id_requestor + ", User=" + Newtonsoft.Json.JsonConvert.SerializeObject(u));
+                                            await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "Request " + request.Number_flight + " " + request.Origin + "-" + request.Destination + " at " + request.DepartureDateTime.ToString("dd-MM-yyyy HH:m") + " taken to work!");
+                                        }
                                     }
                                 }
                             }
@@ -563,6 +643,11 @@ namespace StaffCommunity
                                 var res = Methods.PushStatusRequest(request, "Request canceled");
                                 eventLogBot.WriteEntry("Push. " + res);
                             }
+                            else
+                            {
+                                var u = Methods.GetUser(request.Id_requestor);
+                                await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "The reporter refused to work with your request " + request.Number_flight + " " + request.Origin + "-" + request.Destination + " at " + request.DepartureDateTime.ToString("dd-MM-yyyy HH:m") + "!");
+                            }
                         }
                         else if (message.Substring(0, 6) == "/ready")
                         {
@@ -588,12 +673,6 @@ namespace StaffCommunity
                                 //cache.Add("Ready" + userid.Value, "1", policyuser);
                                 cache.Add("User" + userid.Value, "ready1/" + id_request, policyuser);
                                 await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "Number of available seats in economy class:");
-
-                                /*if (request.Source == 1)
-                                {
-                                    var res = Methods.PushStatusRequest(request, "Request ready");
-                                    eventLogBot.WriteEntry("Push. " + res);
-                                }*/
                             }
                         }
 
@@ -634,6 +713,7 @@ namespace StaffCommunity
 
         protected override void OnStop()
         {
+            //Methods.conn.Close();
             eventLogBot.WriteEntry("Staff Community Bot --- OnStop");
         }
 

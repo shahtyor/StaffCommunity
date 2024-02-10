@@ -47,5 +47,53 @@ namespace StaffCommunity.Properties {
                 this["UrlApi"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("6457417713:AAFrqt3BSYdQy3-w73SAXKvrMXGy8btoJ0E")]
+        public string BotToken {
+            get {
+                return ((string)(this["BotToken"]));
+            }
+            set {
+                this["BotToken"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("5")]
+        public string TimeoutProcess {
+            get {
+                return ((string)(this["TimeoutProcess"]));
+            }
+            set {
+                this["TimeoutProcess"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("15")]
+        public string TimeoutVoid {
+            get {
+                return ((string)(this["TimeoutVoid"]));
+            }
+            set {
+                this["TimeoutVoid"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("6906986784:AAGWHhFXFQ3YVyu_c0fdJ1v13Pwsn5nbmBg")]
+        public string BotSearchToken {
+            get {
+                return ((string)(this["BotSearchToken"]));
+            }
+            set {
+                this["BotSearchToken"] = value;
+            }
+        }
     }
 }
