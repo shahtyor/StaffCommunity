@@ -12,7 +12,7 @@ namespace StaffCommunity.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.8.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.9.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -59,13 +59,28 @@ namespace StaffCommunity.Properties {
                 this["BotToken"] = value;
             }
         }
-        
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2")]
+        public int TimeoutReady
+        {
+            get
+            {
+                return ((int)(this["TimeoutReady"]));
+            }
+            set
+            {
+                this["TimeoutReady"] = value;
+            }
+        }
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("5")]
-        public string TimeoutProcess {
+        public int TimeoutProcess {
             get {
-                return ((string)(this["TimeoutProcess"]));
+                return ((int)(this["TimeoutProcess"]));
             }
             set {
                 this["TimeoutProcess"] = value;
@@ -75,9 +90,9 @@ namespace StaffCommunity.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("15")]
-        public string TimeoutVoid {
+        public int TimeoutVoid {
             get {
-                return ((string)(this["TimeoutVoid"]));
+                return ((int)(this["TimeoutVoid"]));
             }
             set {
                 this["TimeoutVoid"] = value;
@@ -95,5 +110,17 @@ namespace StaffCommunity.Properties {
                 this["BotSearchToken"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool AgentControl {
+            get {
+                return ((bool)(this["AgentControl"]));
+            }
+            set {
+                this["AgentControl"] = value;
+            }
+        }       
     }
 }

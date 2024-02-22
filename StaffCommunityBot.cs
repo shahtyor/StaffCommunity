@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.Caching;
 using System.Runtime.InteropServices;
@@ -131,64 +132,9 @@ namespace StaffCommunity
 
             try
             {
-                var forcancel = Methods.SearchRequestsForCancel(1);
-                foreach (var req in forcancel)
-                {
-                    // Сообщение репортеру
-                    var urep = Methods.GetUser(req.Id_reporter);
-
-                    // Убираем сообщение с ready/cancel
-                    var mespar = Methods.GetMessageParameters(req.Id, 1);
-                    foreach (var tm in mespar)
-                    {
-                        await bot.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
-                    }
-                    Methods.DelMessageParameters(req.Id, 1);
-
-                    Methods.SetRequestStatus(3, req.Id);
-                    eventLogBot.WriteEntry("auto cancel1 request id=" + req.Id);
-                    await bot.SendTextMessageAsync(new ChatId(urep.id.Value), "You did not respond in the allotted time!");
-
-                    // Сообщение реквестору
-                    if (req.Source == 0)
-                    {
-                        var u = Methods.GetUser(req.Id_requestor);
-                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "The reporter did not respond in the allotted time!");
-                    }
-                    else
-                    {
-                        var res = Methods.PushStatusRequest(req, "The reporter did not respond in the allotted time to your request " + req.Number_flight + " " + req.Origin + "-" + req.Destination + " at " + req.DepartureDateTime.ToString("dd-MM-yyyy HH:m") + "!");
-                        eventLogBot.WriteEntry("Timeout. " + res);
-                    }
-                }
-
-                var forvoid = Methods.SearchRequestsForCancel(2);
-                foreach (var req in forvoid)
-                {
-                    // Убираем сообщение с take
-                    var mespar = Methods.GetMessageParameters(req.Id, 0);
-                    foreach (var tm in mespar)
-                    {
-                        await bot.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
-                    }
-                    Methods.DelMessageParameters(req.Id, 0);
-
-                    Methods.SetRequestStatus(6, req.Id);
-                    var rt = await Methods.ReturnToken(req);
-                    eventLogBot.WriteEntry("auto cancel2 request id=" + req.Id + " Return token. " + Newtonsoft.Json.JsonConvert.SerializeObject(rt));
-
-                    // Сообщение реквестору
-                    if (req.Source == 0)
-                    {
-                        var u = Methods.GetUser(req.Id_requestor);
-                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "Request processing timeout! " + Environment.NewLine + "Возвращено токенов: Subscribe - " + rt.DebtSubscribeTokens + ", Paid - " + rt.DebtNonSubscribeTokens + ". В наличии: Subscribe - " + rt.SubscribeTokens + ", Paid - " + rt.NonSubscribeTokens);
-                    }
-                    else
-                    {
-                        var res = Methods.PushStatusRequest(req, "Request processing timeout!");
-                        eventLogBot.WriteEntry("Timeout. " + res);
-                    }
-                }
+                HideRequests(CancelType.Ready);
+                HideRequests(CancelType.Take);
+                HideRequests(CancelType.Void);
 
                 var requests = Methods.SearchRequests();
 
@@ -206,20 +152,99 @@ namespace StaffCommunity
 
                     eventLogBot.WriteEntry("Show request id=" + req.Id);
 
-                    var ac = req.Number_flight.Substring(0, 2);
-                    var reporters = Methods.GetReporters(ac);
-
-                    foreach (var rep in reporters)
+                    var reporters = Methods.GetReporters(req.Operating);
+                    var repgroup = Methods.GetReporterGroup(reporters);
+                    if (!Properties.Settings.Default.AgentControl)
                     {
-                        Message tm = await bot.SendTextMessageAsync(new ChatId(rep), req.Desc_fligth, null, Telegram.Bot.Types.Enums.ParseMode.Html, replyMarkup: ikm);
-                        Methods.SaveMessageParameters(tm.Chat.Id, tm.MessageId, req.Id, 0);
-                        //eventLogBot.WriteEntry("Show request messageId=" + tm.MessageId + ", user=" + rep);
+                        repgroup = new ReporterGroup() { Main = reporters, Control = new List<long>() };
+                    }
+
+                    if (req.Version_request == 0)
+                    {
+                        foreach (var rep in repgroup.Main)
+                        {
+                            Message tm = await bot.SendTextMessageAsync(new ChatId(rep), req.Desc_fligth, null, Telegram.Bot.Types.Enums.ParseMode.Html, replyMarkup: ikm);
+                            Methods.SaveMessageParameters(tm.Chat.Id, tm.MessageId, req.Id, 0);
+                        }
+                    }
+                    else
+                    {
+                        foreach (var rep in repgroup.Control)
+                        {
+                            Message tm = await bot.SendTextMessageAsync(new ChatId(rep), req.Desc_fligth, null, Telegram.Bot.Types.Enums.ParseMode.Html, replyMarkup: ikm);
+                            Methods.SaveMessageParameters(tm.Chat.Id, tm.MessageId, req.Id, 0);
+                        }
                     }
                 }
             }
             catch (Exception ex) 
             {
                 eventLogBot.WriteEntry("Processing error: " + ex.Message + "..." + ex.StackTrace);
+            }
+        }
+
+        public static async void HideRequests(CancelType type)
+        {
+            // type ready=0/cancel=1/take=2
+
+            var forcancel = Methods.SearchRequestsForCancel(type);
+            foreach (var req in forcancel)
+            {
+                // Сообщение репортеру
+                var urep = Methods.GetUser(req.Id_reporter);
+
+                // Убираем сообщение с ready/cancel/take
+                short mhtype = 1;
+                short newstat = 3;
+                if (type == CancelType.Void) 
+                { 
+                    mhtype = 0;            
+                    newstat = 6;
+                }
+                var mespar = Methods.GetMessageParameters(req.Id, mhtype);
+                foreach (var tm in mespar)
+                {
+                    await bot.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
+                }
+                Methods.DelMessageParameters(req.Id, mhtype);
+
+                Methods.SetRequestStatus(newstat, req.Id);
+                TokenCollection rt = new TokenCollection();
+                if (type == CancelType.Void)
+                {
+                    rt = await Methods.ReturnToken(req);
+                    eventLogBot.WriteEntry("auto cancel2 request id=" + req.Id + " Return token. " + Newtonsoft.Json.JsonConvert.SerializeObject(rt));
+                }
+                else
+                {
+                    eventLogBot.WriteEntry("auto cancel1 request id=" + req.Id);
+                    await bot.SendTextMessageAsync(new ChatId(urep.id.Value), "You did not respond in the allotted time!");
+                }
+
+                // Сообщение реквестору
+                string mestext1 = "";
+                string mestext2 = "";
+                if (type == CancelType.Void)
+                {
+                    mestext1 = "Request processing timeout! " + Environment.NewLine + "Возвращено токенов: Subscribe - " + rt.DebtSubscribeTokens + ", Paid - " + rt.DebtNonSubscribeTokens + ". В наличии: Subscribe - " + rt.SubscribeTokens + ", Paid - " + rt.NonSubscribeTokens;
+                    mestext2 = "Request processing timeout!";
+                }
+                else
+                {
+                    mestext1 = "The reporter did not respond in the allotted time!";
+                    mestext2 = "The reporter did not respond in the allotted time to your request " + req.Number_flight + " " + req.Origin + "-" + req.Destination + " at " + req.DepartureDateTime.ToString("dd-MM-yyyy HH:mm") + "!";
+                }
+
+                if (req.Source == 0)
+                {
+                    var u = Methods.GetUser(req.Id_requestor);
+                    await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), mestext1);
+                }
+                else
+                {
+                    var res = Methods.PushStatusRequest(req, mestext2);
+                    eventLogBot.WriteEntry("Timeout. " + res);
+                }
             }
         }
 

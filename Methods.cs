@@ -195,6 +195,10 @@ namespace StaffCommunity
                     user.Token = new sign_in() { id_user = id_user };
                 }
             }
+            else
+            {
+                user = new telegram_user() { id = id, own_ac = "??", is_reporter = true, is_requestor = false };
+            }
 
             reader.Close();
             reader.Dispose();
@@ -445,7 +449,7 @@ namespace StaffCommunity
                     string time_flight = reader["time_flight"].ToString();
                     string Id_reporter = reader["id_reporter"].ToString();
                     DateTime DepartureDateTime = new DateTime(int.Parse(date_flight.Substring(4, 2)) + 2000, int.Parse(date_flight.Substring(2, 2)), int.Parse(date_flight.Substring(0, 2)), int.Parse(time_flight.Substring(0, 2)), int.Parse(time_flight.Substring(2, 2)), 0);
-                    Request request = new Request() { Id = (long)reader["id"], Id_requestor = reader["id_requestor"].ToString(), Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString() };
+                    Request request = new Request() { Id = (long)reader["id"], Id_group = (long)reader["id_group"], Version_request = (short)reader["version_request"], Id_requestor = reader["id_requestor"].ToString(), Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Operating = reader["operating"].ToString(), Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString() };
                     if (!string.IsNullOrEmpty(Id_reporter))
                     {
                         request.Id_reporter = Id_reporter;
@@ -459,19 +463,24 @@ namespace StaffCommunity
             return result;
         }
 
-        public static List<Request> SearchRequestsForCancel(short type)
+        public static List<Request> SearchRequestsForCancel(CancelType type)
         {
             List<Request> result = new List<Request>();
             string sqltext = "";
-            if (type == 1)
+            if (type == CancelType.Ready)
             {
                 // Запросы для отмены
-                sqltext = "select * from telegram_request where request_status in (2,4) and coalesce(ts_change, now()) < now() - interval '" + Properties.Settings.Default.TimeoutProcess + " minute'";
+                sqltext = "select * from telegram_request where request_status=4 and coalesce(ts_change, now()) < now() - interval '" + Properties.Settings.Default.TimeoutReady + " minute'";
+            }
+            else if (type == CancelType.Take)
+            {
+                // Запросы для отмены
+                sqltext = "select * from telegram_request where request_status=2 and coalesce(ts_change, now()) < now() - interval '" + Properties.Settings.Default.TimeoutProcess + " minute'";
             }
             else
             {
                 // Запрос для закрытия
-                sqltext = "select * from telegram_request where request_status=1 and ts_create < now() - interval '" + Properties.Settings.Default.TimeoutVoid + " minute'";
+                sqltext = "select * from telegram_request where request_status in (1,3) and ts_create < now() - interval '" + Properties.Settings.Default.TimeoutVoid + " minute'";
             }
 
             NpgsqlCommand com = new NpgsqlCommand(sqltext, conn);
@@ -483,7 +492,7 @@ namespace StaffCommunity
                     string time_flight = reader["time_flight"].ToString();
                     string Id_reporter = reader["id_reporter"].ToString();
                     DateTime DepartureDateTime = new DateTime(int.Parse(date_flight.Substring(4, 2)) + 2000, int.Parse(date_flight.Substring(2, 2)), int.Parse(date_flight.Substring(0, 2)), int.Parse(time_flight.Substring(0, 2)), int.Parse(time_flight.Substring(2, 2)), 0);
-                    Request request = new Request() { Id = (long)reader["id"], Id_requestor = reader["id_requestor"].ToString(), Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString(), Source = (short)reader["source"], SubscribeTokens = (int)reader["subscribe_tokens"], PaidTokens = (int)reader["paid_tokens"] };
+                    Request request = new Request() { Id = (long)reader["id"], Id_requestor = reader["id_requestor"].ToString(), Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Operating = reader["operating"].ToString(), Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString(), Source = (short)reader["source"], SubscribeTokens = (int)reader["subscribe_tokens"], PaidTokens = (int)reader["paid_tokens"] };
                     if (!string.IsNullOrEmpty(Id_reporter))
                     {
                         request.Id_reporter = Id_reporter;
@@ -583,7 +592,7 @@ namespace StaffCommunity
         public static List<long> GetReporters(string ac)
         {
             List<long> result = new List<long>();
-            NpgsqlCommand com = new NpgsqlCommand("select id from telegram_user where is_reporter=true and own_ac=@ac", conn);
+            NpgsqlCommand com = new NpgsqlCommand("select id from telegram_user where is_reporter=true and own_ac=@ac order by first_use", conn);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = ac });
             using (NpgsqlDataReader reader = com.ExecuteReader())
             {
@@ -593,6 +602,22 @@ namespace StaffCommunity
                 }
             }
             com.Dispose();
+            return result;
+        }
+
+        public static ReporterGroup GetReporterGroup(List<long> all)
+        {
+            ReporterGroup result = new ReporterGroup();
+            if (all.Count <= 1)
+            {
+                result.Main.Add(all[0]);
+            }
+            else
+            {
+                var half = Convert.ToInt32(Math.Round(all.Count / 2.0));
+                result.Main = all.GetRange(0, half);
+                result.Control = all.GetRange(half, all.Count - half);
+            }
             return result;
         }
 

@@ -48,6 +48,13 @@ namespace StaffCommunity
         SA = 2
     }
 
+    public enum CancelType
+    {
+        Ready = 0,
+        Take = 1,
+        Void = 2
+    }
+
     public class ExtendedResult
     {
         public List<Flight> DirectRes { get; set; }
@@ -212,12 +219,15 @@ namespace StaffCommunity
     public class Request
     {
         public long Id { get; set; }
+        public long Id_group { get; set; }
+        public short Version_request { get; set; }
         public string Id_requestor { get; set; }
         public string Id_reporter { get; set; }
         public short Request_status { get; set; }
         public string Origin { get; set; }
         public string Destination { get; set; }
         public DateTime DepartureDateTime { get; set; }
+        public string Operating { get; set; }
         public string Number_flight { get; set; }
         public string Desc_fligth { get; set; }
         public int? Economy_count { get; set; }
@@ -248,5 +258,11 @@ namespace StaffCommunity
         public int DebtSubscribeTokens { get; set; }
         public int DebtNonSubscribeTokens { get; set; }
         public string Error { get; set; }
+    }
+
+    public class ReporterGroup
+    {
+        public List<long> Main { get; set; }
+        public List<long> Control { get; set; }
     }
 }
