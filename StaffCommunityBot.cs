@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Runtime.Caching;
 using System.Runtime.InteropServices;
 using System.ServiceProcess;
@@ -65,6 +66,7 @@ namespace StaffCommunity
             eventLogBot.Log = "StaffCommunityLog";
 
             Methods.conn.Open();
+            Methods.connProc.Open();
         }
 
         protected override void OnStart(string[] args)
@@ -191,7 +193,11 @@ namespace StaffCommunity
             foreach (var req in forcancel)
             {
                 // Сообщение репортеру
-                var urep = Methods.GetUser(req.Id_reporter);
+                telegram_user urep = new telegram_user();
+                if (!string.IsNullOrEmpty(req.Id_reporter))
+                {
+                    urep = Methods.GetUser(req.Id_reporter);
+                }
 
                 // Убираем сообщение с ready/cancel/take
                 short mhtype = 1;
@@ -204,7 +210,11 @@ namespace StaffCommunity
                 var mespar = Methods.GetMessageParameters(req.Id, mhtype);
                 foreach (var tm in mespar)
                 {
-                    await bot.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
+                    try
+                    {
+                        await bot.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
+                    }
+                    catch { }
                 }
                 Methods.DelMessageParameters(req.Id, mhtype);
 
@@ -218,7 +228,10 @@ namespace StaffCommunity
                 else
                 {
                     eventLogBot.WriteEntry("auto cancel1 request id=" + req.Id);
-                    await bot.SendTextMessageAsync(new ChatId(urep.id.Value), "You did not respond in the allotted time!");
+                    if (urep.id != null)
+                    {
+                        await bot.SendTextMessageAsync(new ChatId(urep.id.Value), "You did not respond in the allotted time!");
+                    }
                 }
 
                 // Сообщение реквестору
@@ -296,9 +309,25 @@ namespace StaffCommunity
                         if (message?.Text?.ToLower() == "/start")
                         {
                             await botClient.SendTextMessageAsync(message.Chat, "Инструкция, как пользоваться ботом");
-                            await botClient.SendTextMessageAsync(message.Chat, "Enter the token:");
 
-                            cache.Add("User" + userid.Value, "entertoken", policyuser);
+                            if (user.Token == null)
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat, "Enter the token:");
+
+                                cache.Add("User" + userid.Value, "entertoken", policyuser);
+                            }
+                            else if (string.IsNullOrEmpty(user.Nickname))
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname:");
+
+                                cache.Add("User" + userid.Value, "enternick", policyuser);
+                            }
+                            else if (user.own_ac == "??")
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code:");
+
+                                cache.Add("User" + userid.Value, "preset", policyuser);
+                            }
 
                             return;
                         }
@@ -333,19 +362,30 @@ namespace StaffCommunity
                             if (isGuid0)
                             {
                                 string alert = null;
-                                user = Methods.ProfileCommand(userid.Value, message.Text, eventLogBot, user, out alert);
+                                user = Methods.ProfileCommand(userid.Value, message.Text, eventLogBot, out alert);
 
                                 if (string.IsNullOrEmpty(alert))
                                 {
                                     cache.Add(keyuser, user, policyuser);
                                     cache.Remove("User" + message.Chat.Id);
-                                    if (user.own_ac == "??")
+
+                                    if (string.IsNullOrEmpty(user.Nickname))
                                     {
-                                        await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline:", replyMarkup: GetIkmSetAir(user.own_ac));
+                                        await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname:");
+
+                                        cache.Add("User" + userid.Value, "enternick", policyuser);
+                                    }
+                                    else if (user.own_ac == "??")
+                                    {
+                                        //await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline:", replyMarkup: GetIkmSetAir(user.own_ac));
+                                        await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code:");
+
+                                        cache.Add("User" + userid.Value, "preset", policyuser);
                                     }
                                     else
                                     {
-                                        await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Change your airline:", replyMarkup: GetIkmSetAir(user.own_ac));
+                                        await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your nickname:");
+                                        cache.Add("User" + userid.Value, "enternick", policyuser);
                                     }
                                 }
                                 else
@@ -375,6 +415,32 @@ namespace StaffCommunity
                             }
 
                             return;
+                        }
+
+                        if (comm == "enternick" && !string.IsNullOrEmpty(message.Text))
+                        {
+                            var NickAvail = Methods.NickAvailable(message.Text, user.Token.type + "_" + user.Token.id_user);
+
+                            if (NickAvail)
+                            {
+                                Methods.SetNickname(message.Text, user.Token.type + "_" + user.Token.id_user);
+                                user.Nickname = message.Text;
+                                Methods.UpdateUserInCache(user);
+                                cache.Remove("User" + message.Chat.Id);
+                                await botClient.SendTextMessageAsync(message.Chat, "Your nickname is " + user.Nickname + "!");
+
+                                if (user.own_ac == "??")
+                                {
+                                    await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code:");
+
+                                    cache.Add("User" + userid.Value, "preset", policyuser);
+                                }
+
+                            }
+                            else
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat, "This nickname is already taken!" + Environment.NewLine + "Specify your nickname:");
+                            }
                         }
 
                         if (comm == "preset" && message.Text.Length == 2)

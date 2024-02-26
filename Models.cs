@@ -13,6 +13,7 @@ namespace StaffCommunity
         public string permitted_ac { get; set; }
         public ExtendedResult exres { get; set; }
         public sign_in Token { get; set; }
+        public string Nickname { get; set; }
     }
 
     public class sign_in
@@ -258,6 +259,16 @@ namespace StaffCommunity
         public int DebtSubscribeTokens { get; set; }
         public int DebtNonSubscribeTokens { get; set; }
         public string Error { get; set; }
+    }
+
+    public class ProfileTokens
+    {
+        public int SubscribeTokens { get; set; }
+        public int NonSubscribeTokens { get; set; }
+        public bool Premium { get; set; }
+        public string Error { get; set; }
+        public string Timing { get; set; }
+        public string OwnAC { get; set; }
     }
 
     public class ReporterGroup
