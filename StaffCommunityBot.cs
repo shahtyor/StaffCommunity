@@ -85,8 +85,12 @@ namespace StaffCommunity
                 serviceStatus.dwCurrentState = ServiceState.SERVICE_RUNNING;
                 SetServiceStatus(this.ServiceHandle, ref serviceStatus);
 
-                var s = bot.GetMeAsync().Result.FirstName;
-                eventLogBot.WriteEntry("Запущен бот " + bot.GetMeAsync().Result.FirstName);
+                var task = Task.Run(async () => await bot.GetMeAsync());
+                if (task.IsCompleted)
+                {
+                    var sfname = task.Result.FirstName;
+                    eventLogBot.WriteEntry("Запущен бот " + sfname);
+                }
 
                 System.Timers.Timer aTimer = new System.Timers.Timer();
 
@@ -339,7 +343,7 @@ namespace StaffCommunity
 
                             return;
                         }
-                        else if (message?.Text?.ToLower() == "/set_air")
+                        else if (message?.Text?.ToLower() == "/preset")
                         {
                             await botClient.SendTextMessageAsync(message.Chat, "Enter your airline's code:");
 
@@ -366,7 +370,8 @@ namespace StaffCommunity
 
                                 if (string.IsNullOrEmpty(alert))
                                 {
-                                    cache.Add(keyuser, user, policyuser);
+                                    UpdateUserInCache(user);
+
                                     cache.Remove("User" + message.Chat.Id);
 
                                     if (string.IsNullOrEmpty(user.Nickname))
@@ -382,11 +387,11 @@ namespace StaffCommunity
 
                                         cache.Add("User" + userid.Value, "preset", policyuser);
                                     }
-                                    else
+                                    /*else
                                     {
                                         await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your nickname:");
                                         cache.Add("User" + userid.Value, "enternick", policyuser);
-                                    }
+                                    }*/
                                 }
                                 else
                                 {
@@ -425,7 +430,7 @@ namespace StaffCommunity
                             {
                                 Methods.SetNickname(message.Text, user.Token.type + "_" + user.Token.id_user);
                                 user.Nickname = message.Text;
-                                Methods.UpdateUserInCache(user);
+                                UpdateUserInCache(user);
                                 cache.Remove("User" + message.Chat.Id);
                                 await botClient.SendTextMessageAsync(message.Chat, "Your nickname is " + user.Nickname + "!");
 
@@ -442,6 +447,7 @@ namespace StaffCommunity
                                 await botClient.SendTextMessageAsync(message.Chat, "This nickname is already taken!" + Environment.NewLine + "Specify your nickname:");
                             }
                         }
+                        
 
                         if (comm == "preset" && message.Text.Length == 2)
                         {
@@ -464,7 +470,7 @@ namespace StaffCommunity
                                 //var sperm = string.Join('-', permitted.Select(p => p.Permit));
                                 user.own_ac = ac;
                                 //user.permitted_ac = sperm;
-                                Methods.UpdateUserInCache(user);
+                                UpdateUserInCache(user);
 
                                 cache.Remove("User" + message.Chat.Id);
 
@@ -794,6 +800,18 @@ namespace StaffCommunity
         public static string CombineUserId(telegram_user user)
         {
             return user.Token.type + "_" + user.Token.id_user;
+        }
+
+        private static void UpdateUserInCache(telegram_user user)
+        {
+            string keyuser = "teluser:" + user.id;
+            cache.Remove(keyuser);
+            cache.Add(keyuser, user, policyuser);
+            try
+            {
+                eventLogBot.WriteEntry("UpdateUserInCache. keyuser=" + keyuser + ". " + Newtonsoft.Json.JsonConvert.SerializeObject(user));
+            }
+            catch { }
         }
 
         public static async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)

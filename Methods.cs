@@ -64,8 +64,8 @@ namespace StaffCommunity
                     {
                         NpgsqlDataReader reader = com.ExecuteReader();
 
-                        //var PT = GetProfile(token.type + "_" + token.id_user).Result;
-                        var PT = new ProfileTokens();
+                        var PT = GetProfile(token.type + "_" + token.id_user).Result;
+                        //var PT = new ProfileTokens();
                         string new_ac = PT?.OwnAC ?? "??";
 
                         if (reader.Read())
@@ -125,7 +125,7 @@ namespace StaffCommunity
                             }
                             com2.Dispose();
 
-                            user = new telegram_user() { id = id, first_use = DateTime.Now, own_ac = "??", is_reporter = true, is_requestor = false, Token = token };
+                            user = new telegram_user() { id = id, first_use = DateTime.Now, own_ac = new_ac, is_reporter = true, is_requestor = false, Token = token };
                         }
                     }
                     catch (Exception ex)
