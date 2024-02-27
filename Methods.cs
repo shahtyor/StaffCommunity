@@ -637,7 +637,7 @@ namespace StaffCommunity
         public static List<long> GetReporters(string ac)
         {
             List<long> result = new List<long>();
-            NpgsqlCommand com = new NpgsqlCommand("select id from telegram_user where is_reporter=true and own_ac=@ac order by first_use", connProc);
+            NpgsqlCommand com = new NpgsqlCommand("select id from telegram_user where id is not null and is_reporter=true and own_ac=@ac order by first_use", connProc);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = ac });
             using (NpgsqlDataReader reader = com.ExecuteReader())
             {
@@ -652,7 +652,7 @@ namespace StaffCommunity
 
         public static ReporterGroup GetReporterGroup(List<long> all)
         {
-            ReporterGroup result = new ReporterGroup();
+            ReporterGroup result = new ReporterGroup() { Main = new List<long>(), Control = new List<long>() };
             if (all.Count <= 1)
             {
                 result.Main.Add(all[0]);
