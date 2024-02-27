@@ -332,6 +332,10 @@ namespace StaffCommunity
 
                                 cache.Add("User" + userid.Value, "preset", policyuser);
                             }
+                            else
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Your nickname is " + user.Nickname + Environment.NewLine + "Waiting for new requests...");                                
+                            }
 
                             return;
                         }
@@ -372,6 +376,11 @@ namespace StaffCommunity
                                 {
                                     UpdateUserInCache(user);
 
+                                    if (!string.IsNullOrEmpty(user.own_ac))
+                                    {
+                                        await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac);
+                                    }
+
                                     cache.Remove("User" + message.Chat.Id);
 
                                     if (string.IsNullOrEmpty(user.Nickname))
@@ -387,11 +396,6 @@ namespace StaffCommunity
 
                                         cache.Add("User" + userid.Value, "preset", policyuser);
                                     }
-                                    /*else
-                                    {
-                                        await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your nickname:");
-                                        cache.Add("User" + userid.Value, "enternick", policyuser);
-                                    }*/
                                 }
                                 else
                                 {
@@ -422,25 +426,36 @@ namespace StaffCommunity
                             return;
                         }
 
-                        if (comm == "enternick" && !string.IsNullOrEmpty(message.Text))
+                        if (comm == "enternick" && user.Token != null && !string.IsNullOrEmpty(message.Text))
                         {
                             var NickAvail = Methods.NickAvailable(message.Text, user.Token.type + "_" + user.Token.id_user);
 
                             if (NickAvail)
                             {
-                                Methods.SetNickname(message.Text, user.Token.type + "_" + user.Token.id_user);
-                                user.Nickname = message.Text;
-                                UpdateUserInCache(user);
-                                cache.Remove("User" + message.Chat.Id);
-                                await botClient.SendTextMessageAsync(message.Chat, "Your nickname is " + user.Nickname + "!");
+                                var alertnick = Methods.SetNickname(message.Text, user.Token.type + "_" + user.Token.id_user);
 
-                                if (user.own_ac == "??")
+                                if (string.IsNullOrEmpty(alertnick))
                                 {
-                                    await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code:");
+                                    user.Nickname = message.Text;
+                                    UpdateUserInCache(user);
+                                    cache.Remove("User" + message.Chat.Id);
+                                    await botClient.SendTextMessageAsync(message.Chat, "Your nickname is " + user.Nickname + "!");
 
-                                    cache.Add("User" + userid.Value, "preset", policyuser);
+                                    if (user.own_ac == "??")
+                                    {
+                                        await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code:");
+
+                                        cache.Add("User" + userid.Value, "preset", policyuser);
+                                    }
+                                    else
+                                    {
+                                        await botClient.SendTextMessageAsync(message.Chat, "Waiting for new requests...");
+                                    }
                                 }
-
+                                else
+                                {
+                                    await botClient.SendTextMessageAsync(message.Chat, alertnick);
+                                }
                             }
                             else
                             {
@@ -449,7 +464,7 @@ namespace StaffCommunity
                         }
                         
 
-                        if (comm == "preset" && message.Text.Length == 2)
+                        if (comm == "preset")
                         {
                             //eventLogBot.WriteEntry("command preset");
 

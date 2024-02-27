@@ -110,7 +110,7 @@ namespace StaffCommunity
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "own_ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = new_ac });
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = true });
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_requestor", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = false });
-                            com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = token.type + " " + token.id_user });
+                            com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = token.type + "_" + token.id_user });
 
                             eventLogBot.WriteEntry(com2.CommandText);
 
@@ -144,8 +144,10 @@ namespace StaffCommunity
             return user;
         }
 
-        public static void SetNickname(string Nickname, string id_user)
+        public static string SetNickname(string Nickname, string id_user)
         {
+            string alert = null;
+
             NpgsqlCommand com = new NpgsqlCommand("update telegram_user set nickname=@nickname where id_user=@id_user", conn);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "nickname", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = Nickname });
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = id_user });
@@ -154,9 +156,14 @@ namespace StaffCommunity
             {
                 com.ExecuteNonQuery();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                alert = ex.Message + "..." + ex.StackTrace;
+            }
 
             com.Dispose();
+
+            return alert;
         }
 
         public static telegram_user GetUser(string id_user)
@@ -182,7 +189,7 @@ namespace StaffCommunity
                     }
 
                     var id_user_arr = id_user.Split('_');
-                    user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Token = new sign_in() { type = short.Parse(id_user_arr[0]), id_user = id_user_arr[1] } };
+                    user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), Token = new sign_in() { type = short.Parse(id_user_arr[0]), id_user = id_user_arr[1] } };
 
                     cache.Add(keyus, user, policyuser);
                 }
