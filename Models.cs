@@ -56,6 +56,12 @@ namespace StaffCommunity
         Void = 2
     }
 
+    public enum AirlineAction
+    {
+        Add = 0,
+        Delete = 1
+    }
+
     public class ExtendedResult
     {
         public List<Flight> DirectRes { get; set; }

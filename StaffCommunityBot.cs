@@ -12,6 +12,7 @@ using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Requests.Abstractions;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 
 namespace StaffCommunity
@@ -104,7 +105,7 @@ namespace StaffCommunity
                 var cancellationToken = cts.Token;
                 var receiverOptions = new ReceiverOptions
                 {
-                    AllowedUpdates = { }, // receive all update types
+                    AllowedUpdates = Array.Empty<UpdateType>(), // receive all update types
                 };
                 bot.StartReceiving(
                     HandleUpdateAsync,
@@ -135,6 +136,8 @@ namespace StaffCommunity
         public static async Task Processing()
         {
             eventLogBot.WriteEntry("Processing: " + DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss"));
+
+            //Message msg = await bot.SendTextMessageAsync(new ChatId(5231676978), "test");
 
             try
             {
@@ -352,9 +355,17 @@ namespace StaffCommunity
                             await botClient.SendTextMessageAsync(message.Chat, "Enter your airline's code:");
 
                             cache.Add("User" + userid.Value, "preset", policyuser);
-                            eventLogBot.WriteEntry("cache command User" +userid.Value);
-                        }
 
+                            return;
+                        }
+                        else if (message?.Text?.ToLower() == "/nick")
+                        {
+                            await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname:");
+
+                            cache.Add("User" + userid.Value, "enternick", policyuser);
+
+                            return;
+                        }
 
                         string comm = "";
                         var commexist = cache.Contains("User" + userid.Value);
@@ -461,8 +472,7 @@ namespace StaffCommunity
                             {
                                 await botClient.SendTextMessageAsync(message.Chat, "This nickname is already taken!" + Environment.NewLine + "Specify your nickname:");
                             }
-                        }
-                        
+                        }                        
 
                         if (comm == "preset")
                         {
@@ -804,6 +814,45 @@ namespace StaffCommunity
                     }
 
                     return;
+                }
+                else if (update.Type == UpdateType.MyChatMember)
+                {
+                    var myChatMember = update.MyChatMember;
+
+                    //var message = update.Message;
+                    long? userid = null;
+                    telegram_user user = null;
+
+                    if (myChatMember.From != null)
+                    {
+                        userid = myChatMember.From.Id;
+                        string keyuser = "teluser:" + userid;
+                        var userexist = cache.Contains(keyuser);
+                        if (userexist) user = (telegram_user)cache.Get(keyuser);
+                        else
+                        {
+                            user = Methods.GetUser(userid.Value);
+                            cache.Add(keyuser, user, policyuser);
+                        }
+                    }
+
+                    var CM = myChatMember.NewChatMember;
+                    if (CM.Status == ChatMemberStatus.Kicked) // Заблокировал чат
+                    {
+                        Methods.UserBlockChat(userid.Value, AirlineAction.Delete);
+                        if (user.own_ac != "??")
+                        {
+                            Methods.UpdateAirlinesReporter(user.own_ac, AirlineAction.Delete);
+                        }
+                    }
+                    else if (CM.Status == ChatMemberStatus.Member) // Разблокировал чат
+                    {
+                        Methods.UserBlockChat(userid.Value, AirlineAction.Add);
+                        if (user.own_ac != "??")
+                        {
+                            Methods.UpdateAirlinesReporter(user.own_ac, AirlineAction.Add);
+                        }
+                    }
                 }
             }
             catch (Exception ex) 
