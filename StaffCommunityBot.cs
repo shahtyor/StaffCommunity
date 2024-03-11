@@ -25,7 +25,7 @@ namespace StaffCommunity
         //TestStaffCommunityBot 6457417713:AAFrqt3BSYdQy3-w73SAXKvrMXGy8btoJ0E
         //TestStaffSearchBot 6906986784:AAGWHhFXFQ3YVyu_c0fdJ1v13Pwsn5nbmBg
         static ObjectCache cache = MemoryCache.Default;
-        static CacheItemPolicy policyuser = new CacheItemPolicy() { SlidingExpiration = TimeSpan.Zero, AbsoluteExpiration = DateTimeOffset.Now.AddMinutes(10) };
+        static CacheItemPolicy policyuser = new CacheItemPolicy() { SlidingExpiration = TimeSpan.Zero, AbsoluteExpiration = DateTimeOffset.Now.AddMonths(6) };
 
         public enum ServiceState
         {
@@ -162,11 +162,17 @@ namespace StaffCommunity
                     eventLogBot.WriteEntry("Show request id=" + req.Id);
 
                     var reporters = Methods.GetReporters(req.Operating);
+
+                    eventLogBot.WriteEntry("reporters=" + Newtonsoft.Json.JsonConvert.SerializeObject(reporters));
+
                     var repgroup = Methods.GetReporterGroup(reporters);
+
                     if (!Properties.Settings.Default.AgentControl)
                     {
                         repgroup = new ReporterGroup() { Main = reporters, Control = new List<long>() };
                     }
+
+                    eventLogBot.WriteEntry("repgroup=" + Newtonsoft.Json.JsonConvert.SerializeObject(repgroup));
 
                     if (req.Version_request == 0)
                     {
@@ -174,6 +180,8 @@ namespace StaffCommunity
                         {
                             Message tm = await bot.SendTextMessageAsync(new ChatId(rep), req.Desc_fligth, null, Telegram.Bot.Types.Enums.ParseMode.Html, replyMarkup: ikm);
                             Methods.SaveMessageParameters(tm.Chat.Id, tm.MessageId, req.Id, 0);
+
+                            eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tm.Chat.Id + ", MessageId=" + tm.MessageId + ", req.Id=" + req.Id + ", type=0");
                         }
                     }
                     else
@@ -321,19 +329,19 @@ namespace StaffCommunity
                             {
                                 await botClient.SendTextMessageAsync(message.Chat, "Enter the token:");
 
-                                cache.Add("User" + userid.Value, "entertoken", policyuser);
+                                UpdateCommandInCache(userid.Value, "entertoken");
                             }
                             else if (string.IsNullOrEmpty(user.Nickname))
                             {
                                 await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname:");
 
-                                cache.Add("User" + userid.Value, "enternick", policyuser);
+                                UpdateCommandInCache(userid.Value, "enternick");
                             }
                             else if (user.own_ac == "??")
                             {
                                 await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code:");
 
-                                cache.Add("User" + userid.Value, "preset", policyuser);
+                                UpdateCommandInCache(userid.Value, "preset");
                             }
                             else
                             {
@@ -346,7 +354,7 @@ namespace StaffCommunity
                         {
                             await botClient.SendTextMessageAsync(message.Chat, "Enter the token:");
 
-                            cache.Add("User" + userid.Value, "entertoken", policyuser);
+                            UpdateCommandInCache(userid.Value, "entertoken");
 
                             return;
                         }
@@ -354,7 +362,7 @@ namespace StaffCommunity
                         {
                             await botClient.SendTextMessageAsync(message.Chat, "Enter your airline's code:");
 
-                            cache.Add("User" + userid.Value, "preset", policyuser);
+                            UpdateCommandInCache(userid.Value, "preset");
 
                             return;
                         }
@@ -362,7 +370,7 @@ namespace StaffCommunity
                         {
                             await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname:");
 
-                            cache.Add("User" + userid.Value, "enternick", policyuser);
+                            UpdateCommandInCache(userid.Value, "enternick");
 
                             return;
                         }
@@ -398,14 +406,14 @@ namespace StaffCommunity
                                     {
                                         await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname:");
 
-                                        cache.Add("User" + userid.Value, "enternick", policyuser);
+                                        UpdateCommandInCache(userid.Value, "enternick");
                                     }
                                     else if (user.own_ac == "??")
                                     {
                                         //await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline:", replyMarkup: GetIkmSetAir(user.own_ac));
                                         await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code:");
 
-                                        cache.Add("User" + userid.Value, "preset", policyuser);
+                                        UpdateCommandInCache(userid.Value, "preset");
                                     }
                                 }
                                 else
@@ -456,7 +464,7 @@ namespace StaffCommunity
                                     {
                                         await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code:");
 
-                                        cache.Add("User" + userid.Value, "preset", policyuser);
+                                        UpdateCommandInCache(userid.Value, "preset");
                                     }
                                     else
                                     {
@@ -518,11 +526,10 @@ namespace StaffCommunity
 
                                 eventLogBot.WriteEntry("command ready1. id: " + commwithpar[1]);
 
-                                int n;
-                                bool isNumeric = int.TryParse(message?.Text, out n);
-                                if (isNumeric && n >= 0)
+                                short n;
+                                bool isNumeric = short.TryParse(message?.Text, out n);
+                                if (isNumeric)
                                 {
-                                    cache.Remove("User" + message.Chat.Id);
                                     try
                                     {
                                         Methods.SetCount(long.Parse(commwithpar[1]), PlaceType.Economy, n);
@@ -531,7 +538,8 @@ namespace StaffCommunity
                                     {
                                         eventLogBot.WriteEntry("SetCount: " + ex.Message + "..." + ex.StackTrace);
                                     }
-                                    cache.Add("User" + message.Chat.Id, "ready2/" + commwithpar[1], policyuser);
+
+                                    UpdateCommandInCache(message.Chat.Id, "ready2/" + commwithpar[1]);
                                     await botClient.SendTextMessageAsync(message.Chat, "Number of available seats in business class:");
                                 }
                                 else
@@ -546,13 +554,14 @@ namespace StaffCommunity
                                 //eventLogBot.WriteEntry("command ready2");
 
                                 var commwithpar = comm.Split('/');
-                                int n;
-                                bool isNumeric = int.TryParse(message?.Text, out n);
-                                if (isNumeric && n >= 0)
+                                short n;
+                                bool isNumeric = short.TryParse(message?.Text, out n);
+                                if (isNumeric)
                                 {
-                                    cache.Remove("User" + message.Chat.Id);
                                     Methods.SetCount(long.Parse(commwithpar[1]), PlaceType.Business, n);
-                                    cache.Add("User" + message.Chat.Id, "ready3/" + commwithpar[1], policyuser);
+
+                                    UpdateCommandInCache(message.Chat.Id, "ready3/" + commwithpar[1]);
+
                                     await botClient.SendTextMessageAsync(message.Chat, "Number of SA passengers:");
                                 }
                                 else
@@ -567,9 +576,9 @@ namespace StaffCommunity
                                 //eventLogBot.WriteEntry("command ready3");
 
                                 var commwithpar = comm.Split('/');
-                                int n;
-                                bool isNumeric = int.TryParse(message?.Text, out n);
-                                if (isNumeric && n >= 0)
+                                short n;
+                                bool isNumeric = short.TryParse(message?.Text, out n);
+                                if (isNumeric)
                                 {
                                     var id_req = long.Parse(commwithpar[1]);
                                     cache.Remove("User" + message.Chat.Id);
@@ -649,8 +658,7 @@ namespace StaffCommunity
                         {
                             await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "Enter your airline's code:");
 
-                            cache.Add("User" + callbackquery.From.Id, "preset", policyuser);
-                            eventLogBot.WriteEntry("cache command User" + callbackquery.From.Id);
+                            UpdateCommandInCache(callbackquery.From.Id, "preset");
                         }
                         else if (message.Substring(0, 5) == "/take")
                         {
@@ -709,8 +717,10 @@ namespace StaffCommunity
                                         foreach (TelMessage tm in mespar)
                                         {
                                             await botClient.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
+                                            eventLogBot.WriteEntry("DeleteMessege. ChatId=" + tm.ChatId + ", MessageId=" + tm.MessageId);
                                         }
                                         Methods.DelMessageParameters(id, 0);
+                                        eventLogBot.WriteEntry("DeleteMessege. ChatId=" + id + ", type=0");
 
                                         eventLogBot.WriteEntry("take request id=" + id);
 
@@ -725,6 +735,7 @@ namespace StaffCommunity
 
                                         var tmes = await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "The following query is selected:" + Environment.NewLine + Environment.NewLine + request.Desc_fligth, null, Telegram.Bot.Types.Enums.ParseMode.Html, replyMarkup: replyKeyboardMarkup);
                                         Methods.SaveMessageParameters(tmes.Chat.Id, tmes.MessageId, id, 1);
+                                        eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tmes.Chat.Id + ", MessageId=" + tmes.MessageId + ", req.Id=" + id + ", type=1");
 
                                         if (request.Source == 1)
                                         {
@@ -752,8 +763,10 @@ namespace StaffCommunity
                             foreach (TelMessage tm in mespar)
                             {
                                 await botClient.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
+                                eventLogBot.WriteEntry("DeleteMessege. ChatId=" + tm.ChatId + ", MessageId=" + tm.MessageId);
                             }
                             Methods.DelMessageParameters(id_request, 1);
+                            eventLogBot.WriteEntry("DeleteMessege. ChatId=" + id_request + ", type=1");
 
                             eventLogBot.WriteEntry("cancel request id=" + id_request);
 
@@ -792,25 +805,10 @@ namespace StaffCommunity
 
                                 eventLogBot.WriteEntry("ready request id=" + id_request + ", User=" + userid.Value);
 
-                                //cache.Add("Ready" + userid.Value, "1", policyuser);
-                                cache.Add("User" + userid.Value, "ready1/" + id_request, policyuser);
+                                UpdateCommandInCache(userid.Value, "ready1/" + id_request);
                                 await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "Number of available seats in economy class:");
                             }
                         }
-
-                        /*if (message.Length >= 4 && message.Substring(0, 4) == "/com")
-                        {
-                            var pars = message.Split(' ');
-                            if (pars.Length == 6)
-                            {
-                                var remreq = AddRequest(callbackquery);
-
-                                DateTime dreq = new DateTime(2000 + int.Parse(pars[3].Substring(4, 2)), int.Parse(pars[3].Substring(2, 2)), int.Parse(pars[3].Substring(0, 2)), int.Parse(pars[4].Substring(0, 2)), int.Parse(pars[4].Substring(2, 2)), 0);
-
-                                var reqpost = "You request " + pars[5].Substring(0, 2) + " " + dreq.ToString("dMMM HH:mm", CultureInfo.CreateSpecificCulture("en-US")) + " posted. You have " + remreq + " requests left";
-                                await botClient.SendTextMessageAsync(callbackquery.Message.Chat, reqpost);
-                            }
-                        }*/
                     }
 
                     return;
@@ -869,11 +867,38 @@ namespace StaffCommunity
         private static void UpdateUserInCache(telegram_user user)
         {
             string keyuser = "teluser:" + user.id;
-            cache.Remove(keyuser);
-            cache.Add(keyuser, user, policyuser);
+            var userexist = cache.Contains(keyuser);
+            if (userexist)
+            {
+                cache.Set(keyuser, user, policyuser);
+            }
+            else
+            {
+                cache.Add(keyuser, user, policyuser);
+            }
             try
             {
                 eventLogBot.WriteEntry("UpdateUserInCache. keyuser=" + keyuser + ". " + Newtonsoft.Json.JsonConvert.SerializeObject(user));
+            }
+            catch { }
+        }
+
+        private static void UpdateCommandInCache(long user, string command)
+        {
+            string keycommand = "User" + user;
+
+            var commexist = cache.Contains(keycommand);
+            if (commexist)
+            {
+                cache.Set(keycommand, command, policyuser);
+            }
+            else
+            {
+                cache.Add(keycommand, command, policyuser);
+            }
+            try
+            {
+                eventLogBot.WriteEntry("UpdateCommandInCache. keycommand=" + keycommand + ", command=" + command);
             }
             catch { }
         }

@@ -244,6 +244,7 @@ namespace StaffCommunity
         public string Push_id { get; set; }
         public int SubscribeTokens { get; set; }
         public int PaidTokens { get; set; }
+        public short Pax { get; set; }
     }
 
     public class RequestType

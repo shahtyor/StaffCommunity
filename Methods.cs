@@ -71,7 +71,7 @@ namespace StaffCommunity
 
                         if (reader.Read())
                         {
-                            user = new telegram_user() { first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), is_reporter = true, is_requestor = (bool)reader["is_requestor"], Token = token };
+                            user = new telegram_user() { first_use = (DateTime)reader["first_use"], own_ac = (new_ac == "??" ? reader["own_ac"].ToString() : new_ac), is_reporter = true, is_requestor = (bool)reader["is_requestor"], Token = token };
                             if (user.id == null)
                             {
                                 user.id = id;
@@ -444,7 +444,7 @@ namespace StaffCommunity
                     string time_flight = reader["time_flight"].ToString();
                     string Id_reporter = reader["id_reporter"].ToString();
                     DateTime DepartureDateTime = new DateTime(int.Parse(date_flight.Substring(4, 2)) + 2000, int.Parse(date_flight.Substring(2, 2)), int.Parse(date_flight.Substring(0, 2)), int.Parse(time_flight.Substring(0, 2)), int.Parse(time_flight.Substring(2, 2)), 0);
-                    Request request = new Request() { Id = (long)reader["id"], Id_group = (long)reader["id_group"], Version_request = (short)reader["version_request"], Id_requestor = reader["id_requestor"].ToString(), Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Operating = reader["operating"].ToString(), Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString() };
+                    Request request = new Request() { Id = (long)reader["id"], Id_group = (long)reader["id_group"], Version_request = (short)reader["version_request"], Id_requestor = reader["id_requestor"].ToString(), Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Operating = reader["operating"].ToString(), Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString(), Pax = (short)reader["pax"] };
                     if (!string.IsNullOrEmpty(Id_reporter))
                     {
                         request.Id_reporter = Id_reporter;
@@ -690,7 +690,7 @@ namespace StaffCommunity
             return result;
         }
 
-        public static string SendPushNotification(string applicationID, string senderId, string deviceId, string title, string message)
+        public static string SendPushNotification(string applicationID, string senderId, string deviceId, string sub, string message, string Marketing, string Number, string Origin, string Destination, DateTime DepartureTime, short pax)
         {
             string result = "";
             try
@@ -705,11 +705,23 @@ namespace StaffCommunity
                 {
                     to = deviceId,
                     priority = "high",
+                    direct_boot_ok = true,
                     notification = new
                     {
-                        title = title,
+                        title = Marketing + Number + " " + Origin + "-" + Destination + " " + DepartureTime.ToString("dd-MMM HH:mm"),
+                        subtitle = sub,
                         body = message,
                         sound = "Enabled"
+                    },
+                    data = new
+                    {
+                        type = "agent",
+                        origin = Origin,
+                        destination = Destination,
+                        departureDateTime = DepartureTime.ToString("yyyy-MM-ddTHH:mm:ss"), 
+                        paxAmount = pax,
+                        marketingCarrier = Marketing,
+                        flightNumber = Number
                     }
                 };
 
@@ -748,13 +760,22 @@ namespace StaffCommunity
 
         public static string PushStatusRequest(Request req, string status)
         {
-            string title = req.Number_flight + " " + status;
-            string message = status + ": " + req.Number_flight + " " + req.Origin + "-" + req.Destination + " " + req.DepartureDateTime.ToString("dd-MM-yyyy HH:mm");
+            var message = "";
+            string subtitle = null;
             if (status == "Processing is finished")
             {
-                message += Environment.NewLine + "Economy class: " + req.Economy_count.Value + " seats" + Environment.NewLine + "Business class: " + req.Business_count.Value + " seats" + Environment.NewLine + "SA passengers: " + req.SA_count.Value;
+                message += Environment.NewLine + "Economy:" + req.Economy_count.Value + ", Business:" + req.Business_count.Value + ", SA:" + req.SA_count.Value;
+
+                var ocenka = (req.Economy_count ?? 0) + (req.Business_count ?? 0) - (req.SA_count ?? 0);
+                RType Rating = ocenka <= 1 * req.Pax ? RType.Red : (ocenka < 5 + 2 * req.Pax ? RType.Yellow : RType.Green);
+                subtitle = (Rating == RType.Green ? "Good" : (Rating == RType.Red ? "Bad" : "So-so"));
             }
-            string result = SendPushNotification(SERVER_API_KEY_NEW, SENDER_ID_NEW, req.Push_id, title, message);
+            else
+            {
+                message = status;
+            }
+
+            string result = SendPushNotification(SERVER_API_KEY_NEW, SENDER_ID_NEW, req.Push_id, subtitle, message, req.Number_flight.Substring(0, 2), req.Number_flight.Substring(2), req.Origin, req.Destination, req.DepartureDateTime, req.Pax);
             return result;
         }
 
