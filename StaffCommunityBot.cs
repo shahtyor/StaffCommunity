@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.Diagnostics.Metrics;
+using System.Linq;
 using System.Runtime.Caching;
 using System.Runtime.InteropServices;
 using System.ServiceProcess;
@@ -149,7 +151,7 @@ namespace StaffCommunity
 
                 foreach (var req in requests)
                 {
-                    Methods.SetRequestStatus(1, req.Id);
+                    Methods.SetRequestStatus(1, req);
 
                     var ikm = new InlineKeyboardMarkup(new[]
                     {
@@ -205,6 +207,7 @@ namespace StaffCommunity
             // type ready=0/cancel=1/take=2
 
             var forcancel = Methods.SearchRequestsForCancel(type);
+
             foreach (var req in forcancel)
             {
                 // Сообщение репортеру
@@ -214,14 +217,18 @@ namespace StaffCommunity
                     urep = Methods.GetUser(req.Id_reporter);
                 }
 
-                // Убираем сообщение с ready/cancel/take
+                List<long> replist = null;                
+
                 short mhtype = 1;
                 short newstat = 3;
                 if (type == CancelType.Void) 
                 { 
                     mhtype = 0;            
                     newstat = 6;
+                    replist = Methods.GetReporters(req.Operating);
                 }
+
+                // Убираем сообщение с ready/cancel/take
                 var mespar = Methods.GetMessageParameters(req.Id, mhtype);
                 foreach (var tm in mespar)
                 {
@@ -233,10 +240,16 @@ namespace StaffCommunity
                 }
                 Methods.DelMessageParameters(req.Id, mhtype);
 
-                Methods.SetRequestStatus(newstat, req.Id);
+                Methods.SetRequestStatus(newstat, req);
+
                 TokenCollection rt = new TokenCollection();
                 if (type == CancelType.Void)
                 {
+                    foreach (var repid in replist)
+                    {
+                        await bot.SendTextMessageAsync(new ChatId(repid), "No one answered. The request was canceled by timeout!");
+                    }
+
                     rt = await Methods.ReturnToken(req);
                     eventLogBot.WriteEntry("auto cancel2 request id=" + req.Id + " Return token. " + Newtonsoft.Json.JsonConvert.SerializeObject(rt));
                 }
@@ -584,7 +597,7 @@ namespace StaffCommunity
                                     cache.Remove("User" + message.Chat.Id);
                                     Methods.SetCount(id_req, PlaceType.SA, n);
                                     Request req = Methods.GetRequestStatus(id_req);
-                                    Methods.SetRequestStatus(5, id_req);
+                                    Methods.SetRequestStatus(5, req);
 
                                     eventLogBot.WriteEntry("finished request id=" + id_req);
                                     Methods.DelMessageParameters(id_req);
@@ -757,7 +770,7 @@ namespace StaffCommunity
                             var msg = message.Split(' ');
                             var id_request = long.Parse(msg[1]);
                             var request = Methods.GetRequestStatus(id_request);
-                            Methods.SetRequestStatus(3, id_request);
+                            Methods.SetRequestStatus(3, request);
 
                             var mespar = Methods.GetMessageParameters(id_request, 1);
                             foreach (TelMessage tm in mespar)

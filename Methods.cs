@@ -475,7 +475,7 @@ namespace StaffCommunity
             else
             {
                 // Запрос для закрытия
-                sqltext = "select * from telegram_request where request_status in (1,3) and ts_create < now() - interval '" + Properties.Settings.Default.TimeoutVoid + " minute'";
+                sqltext = "select * from telegram_request where request_status in (1,3) and version_request=0 and ts_create < now() - interval '" + Properties.Settings.Default.TimeoutVoid + " minute'";
             }
 
             NpgsqlCommand com = new NpgsqlCommand(sqltext, connProc);
@@ -487,7 +487,7 @@ namespace StaffCommunity
                     string time_flight = reader["time_flight"].ToString();
                     string Id_reporter = reader["id_reporter"].ToString();
                     DateTime DepartureDateTime = new DateTime(int.Parse(date_flight.Substring(4, 2)) + 2000, int.Parse(date_flight.Substring(2, 2)), int.Parse(date_flight.Substring(0, 2)), int.Parse(time_flight.Substring(0, 2)), int.Parse(time_flight.Substring(2, 2)), 0);
-                    Request request = new Request() { Id = (long)reader["id"], Id_requestor = reader["id_requestor"].ToString(), Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Operating = reader["operating"].ToString(), Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString(), Source = (short)reader["source"], SubscribeTokens = (int)reader["subscribe_tokens"], PaidTokens = (int)reader["paid_tokens"] };
+                    Request request = new Request() { Id = (long)reader["id"], Id_group = (long)reader["id_group"], Id_requestor = reader["id_requestor"].ToString(), Id_reporter = reader["id_reporter"].ToString(), Version_request = (short)reader["version_request"], Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Operating = reader["operating"].ToString(), Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString(), Source = (short)reader["source"], SubscribeTokens = (int)reader["subscribe_tokens"], PaidTokens = (int)reader["paid_tokens"] };
                     if (!string.IsNullOrEmpty(Id_reporter))
                     {
                         request.Id_reporter = Id_reporter;
@@ -517,13 +517,23 @@ namespace StaffCommunity
             com.Dispose();
         }
 
-        public static void SetRequestStatus(short status, long id)
+        public static void SetRequestStatus(short status, Request req)
         {
-            NpgsqlCommand com = new NpgsqlCommand("update telegram_request set request_status=@status, ts_change=now() where id=@id", connProc);
-            com.Parameters.Add(new NpgsqlParameter() { ParameterName = "status", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Smallint, Value = status });
-            com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
-            com.ExecuteNonQuery();
-            com.Dispose();
+            if (status == 6)
+            {
+                NpgsqlCommand com = new NpgsqlCommand("update telegram_request set request_status=6, ts_change=now() where id_group=@id_group", connProc);
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_group", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = req.Id_group });
+                com.ExecuteNonQuery();
+                com.Dispose();
+            }
+            else
+            {
+                NpgsqlCommand com = new NpgsqlCommand("update telegram_request set request_status=@status, ts_change=now() where id=@id", connProc);
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "status", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Smallint, Value = status });
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = req.Id });
+                com.ExecuteNonQuery();
+                com.Dispose();
+            }
         }
 
         public static void SetCount(long id, PlaceType pt, int cnt)
@@ -542,12 +552,13 @@ namespace StaffCommunity
         public static Request GetRequestStatus(long id)
         {
             Request result = new Request();
-            NpgsqlCommand com = new NpgsqlCommand("select origin, destination, number_flight, date_flight, time_flight, request_status, economy_count, business_count, sa_count, desc_flight, source, push_id, id_requestor, id_reporter from telegram_request where id=@id", conn);
+            NpgsqlCommand com = new NpgsqlCommand("select * from telegram_request where id=@id", conn);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
             using (NpgsqlDataReader reader = com.ExecuteReader())
             {
                 if (reader.Read())
                 {
+                    result.Id = id;
                     result.Origin = reader["origin"].ToString();
                     result.Destination = reader["destination"].ToString();
                     result.Number_flight = reader["number_flight"].ToString();
@@ -567,6 +578,8 @@ namespace StaffCommunity
                     result.Push_id = reader["push_id"].ToString();
                     result.Id_requestor = reader["id_requestor"].ToString();
                     result.Id_reporter = reader["id_reporter"].ToString();
+                    result.Id_group = (long)reader["id_group"];
+                    result.Version_request = (short)reader["version_request"];
                 }
             }
             com.Dispose();
