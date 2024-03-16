@@ -75,6 +75,12 @@ namespace StaffCommunity
         public string Alert { get; set; }
     }
 
+    public class FlightInfo
+    {
+        public Flight Flight { get; set; }
+        public string Alert { get; set; }
+    }
+
     public class Flight
     {
         /// <summary>

@@ -205,87 +205,89 @@ namespace StaffCommunity
         public static async void HideRequests(CancelType type)
         {
             // type ready=0/cancel=1/take=2
-
-            var forcancel = Methods.SearchRequestsForCancel(type);
-
-            foreach (var req in forcancel)
+            try
             {
-                // Сообщение репортеру
-                telegram_user urep = new telegram_user();
-                if (!string.IsNullOrEmpty(req.Id_reporter))
+
+                var forcancel = Methods.SearchRequestsForCancel(type);
+
+                foreach (var req in forcancel)
                 {
-                    urep = Methods.GetUser(req.Id_reporter);
-                }
-
-                List<long> replist = null;                
-
-                short mhtype = 1;
-                short newstat = 3;
-                if (type == CancelType.Void) 
-                { 
-                    mhtype = 0;            
-                    newstat = 6;
-                    replist = Methods.GetReporters(req.Operating);
-                }
-
-                // Убираем сообщение с ready/cancel/take
-                var mespar = Methods.GetMessageParameters(req.Id, mhtype);
-                foreach (var tm in mespar)
-                {
-                    try
+                    // Сообщение репортеру
+                    telegram_user urep = new telegram_user();
+                    if (!string.IsNullOrEmpty(req.Id_reporter))
                     {
-                        await bot.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
-                    }
-                    catch { }
-                }
-                Methods.DelMessageParameters(req.Id, mhtype);
-
-                Methods.SetRequestStatus(newstat, req);
-
-                TokenCollection rt = new TokenCollection();
-                if (type == CancelType.Void)
-                {
-                    foreach (var repid in replist)
-                    {
-                        await bot.SendTextMessageAsync(new ChatId(repid), "No one answered. The request was canceled by timeout!");
+                        urep = Methods.GetUser(req.Id_reporter);
                     }
 
-                    rt = await Methods.ReturnToken(req);
-                    eventLogBot.WriteEntry("auto cancel2 request id=" + req.Id + " Return token. " + Newtonsoft.Json.JsonConvert.SerializeObject(rt));
-                }
-                else
-                {
-                    eventLogBot.WriteEntry("auto cancel1 request id=" + req.Id);
-                    if (urep.id != null)
+                    List<long> replist = null;
+
+                    short mhtype = 1;
+                    short newstat = 3;
+                    if (type == CancelType.Void)
                     {
-                        await bot.SendTextMessageAsync(new ChatId(urep.id.Value), "You did not respond in the allotted time!");
+                        mhtype = 0;
+                        newstat = 6;
+                        replist = Methods.GetReporters(req.Operating);
+                    }
+
+                    // Убираем сообщение с ready/cancel/take
+                    var mespar = Methods.GetMessageParameters(req.Id, mhtype);
+                    foreach (var tm in mespar)
+                    {
+                        try
+                        {
+                            await bot.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
+                        }
+                        catch { }
+                    }
+                    Methods.DelMessageParameters(req.Id, mhtype);
+
+                    Methods.SetRequestStatus(newstat, req);
+
+                    TokenCollection rt = new TokenCollection();
+                    if (type == CancelType.Void)
+                    {
+                        rt = await Methods.ReturnToken(req);
+                        eventLogBot.WriteEntry("auto cancel2 request id=" + req.Id + " Return token. " + Newtonsoft.Json.JsonConvert.SerializeObject(rt));
+                    }
+                    else
+                    {
+                        eventLogBot.WriteEntry("auto cancel1 request id=" + req.Id);
+                        if (urep.id != null)
+                        {
+                            await bot.SendTextMessageAsync(new ChatId(urep.id.Value), "You did not respond in the allotted time!");
+                        }
+                    }
+
+                    // Сообщение реквестору
+                    string mestext1 = "";
+                    string mestext2 = "";
+                    if (type == CancelType.Void)
+                    {
+                        mestext1 = "Request processing timeout! " + Environment.NewLine + "Возвращено токенов: Subscribe - " + rt.DebtSubscribeTokens + ", Paid - " + rt.DebtNonSubscribeTokens + ". В наличии: Subscribe - " + rt.SubscribeTokens + ", Paid - " + rt.NonSubscribeTokens;
+                        mestext2 = "Request processing timeout!";
+                    }
+                    else
+                    {
+                        mestext1 = "The reporter did not respond in the allotted time!";
+                        mestext2 = "The reporter did not respond in the allotted time to your request " + req.Number_flight + " " + req.Origin + "-" + req.Destination + " at " + req.DepartureDateTime.ToString("dd-MM-yyyy HH:mm") + "!";
+                    }
+
+                    if (req.Source == 0)
+                    {
+                        var u = Methods.GetUser(req.Id_requestor);
+                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), mestext1);
+                    }
+                    else
+                    {
+                        var res = Methods.PushStatusRequest(req, mestext2);
+                        eventLogBot.WriteEntry("Timeout. " + res);
                     }
                 }
-
-                // Сообщение реквестору
-                string mestext1 = "";
-                string mestext2 = "";
-                if (type == CancelType.Void)
-                {
-                    mestext1 = "Request processing timeout! " + Environment.NewLine + "Возвращено токенов: Subscribe - " + rt.DebtSubscribeTokens + ", Paid - " + rt.DebtNonSubscribeTokens + ". В наличии: Subscribe - " + rt.SubscribeTokens + ", Paid - " + rt.NonSubscribeTokens;
-                    mestext2 = "Request processing timeout!";
-                }
-                else
-                {
-                    mestext1 = "The reporter did not respond in the allotted time!";
-                    mestext2 = "The reporter did not respond in the allotted time to your request " + req.Number_flight + " " + req.Origin + "-" + req.Destination + " at " + req.DepartureDateTime.ToString("dd-MM-yyyy HH:mm") + "!";
-                }
-
-                if (req.Source == 0)
-                {
-                    var u = Methods.GetUser(req.Id_requestor);
-                    await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), mestext1);
-                }
-                else
-                {
-                    var res = Methods.PushStatusRequest(req, mestext2);
-                    eventLogBot.WriteEntry("Timeout. " + res);
-                }
+            }
+            catch (Exception ex) 
+            {
+                eventLogBot.WriteEntry("HideRequests Error. " + ex.Message + "..." + ex.StackTrace);
             }
         }
 

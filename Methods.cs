@@ -234,6 +234,14 @@ namespace StaffCommunity
                 {
                     user.Token = new sign_in() { type = short.Parse(id_user.Split('_')[0]), id_user = id_user.Split('_')[1] };
                 }
+                if (!user.is_reporter)
+                {
+                    NpgsqlCommand com2 = new NpgsqlCommand("update telegram_user set is_reporter=@is_reporter where id=@id");
+                    com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
+                    com.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = true });
+                    com2.ExecuteNonQuery();
+                    com2.Dispose();
+                }
             }
             else
             {
@@ -393,7 +401,6 @@ namespace StaffCommunity
                             "\"event_properties\":{\"ac\":\"" + ac + "\"," +
                             "\"new_status\":\"false\"}}]";
                         var task2 = Task.Run(async () => await AmplitudePOST(DataJson2));
-                        var r2 = task2.Result;
                     }
                 }
                 else
@@ -408,7 +415,6 @@ namespace StaffCommunity
                         "\"event_properties\":{\"ac\":\"" + ac + "\"," +
                         "\"new_status\":\"true\"}}]";
                     var task = Task.Run(async () => await AmplitudePOST(DataJson));
-                    var r = task.Result;
                 }
             }
         }
@@ -487,7 +493,7 @@ namespace StaffCommunity
                     string time_flight = reader["time_flight"].ToString();
                     string Id_reporter = reader["id_reporter"].ToString();
                     DateTime DepartureDateTime = new DateTime(int.Parse(date_flight.Substring(4, 2)) + 2000, int.Parse(date_flight.Substring(2, 2)), int.Parse(date_flight.Substring(0, 2)), int.Parse(time_flight.Substring(0, 2)), int.Parse(time_flight.Substring(2, 2)), 0);
-                    Request request = new Request() { Id = (long)reader["id"], Id_group = (long)reader["id_group"], Id_requestor = reader["id_requestor"].ToString(), Id_reporter = reader["id_reporter"].ToString(), Version_request = (short)reader["version_request"], Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Operating = reader["operating"].ToString(), Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString(), Source = (short)reader["source"], SubscribeTokens = (int)reader["subscribe_tokens"], PaidTokens = (int)reader["paid_tokens"] };
+                    Request request = new Request() { Id = (long)reader["id"], Id_group = (long)reader["id_group"], Id_requestor = reader["id_requestor"].ToString(), Id_reporter = reader["id_reporter"].ToString(), Version_request = (short)reader["version_request"], Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Operating = reader["operating"].ToString(), Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString(), Source = (short)reader["source"], Push_id = reader["push_id"].ToString(), SubscribeTokens = (int)reader["subscribe_tokens"], PaidTokens = (int)reader["paid_tokens"] };
                     if (!string.IsNullOrEmpty(Id_reporter))
                     {
                         request.Id_reporter = Id_reporter;
@@ -722,8 +728,7 @@ namespace StaffCommunity
                     notification = new
                     {
                         title = Marketing + Number + " " + Origin + "-" + Destination + " " + DepartureTime.ToString("dd-MMM HH:mm"),
-                        subtitle = sub,
-                        body = message,
+                        body = sub + Environment.NewLine + message,
                         sound = "Enabled"
                     },
                     data = new
@@ -777,7 +782,7 @@ namespace StaffCommunity
             string subtitle = null;
             if (status == "Processing is finished")
             {
-                message += Environment.NewLine + "Economy:" + req.Economy_count.Value + ", Business:" + req.Business_count.Value + ", SA:" + req.SA_count.Value;
+                message += Environment.NewLine + "Economy:" + req.Economy_count.Value + " Business:" + req.Business_count.Value + " SA:" + req.SA_count.Value + " (agent just reported this)";
 
                 var ocenka = (req.Economy_count ?? 0) + (req.Business_count ?? 0) - (req.SA_count ?? 0);
                 RType Rating = ocenka <= 1 * req.Pax ? RType.Red : (ocenka < 5 + 2 * req.Pax ? RType.Yellow : RType.Green);
@@ -836,6 +841,29 @@ namespace StaffCommunity
                 return new ProfileTokens() { Error = ex.Message + "..." + ex.StackTrace };
             }
             return new ProfileTokens();
+        }
+
+        public static async Task<FlightInfo> GetFlightInfo(string origin, string destination, DateTime date, int pax, string aircompany, string number, string token = "void token")
+        {
+            try
+            {
+                using (HttpClient client = GetClient())
+                {
+                    string Uri = Properties.Settings.Default.UrlApi + "/amadeus/GetFlightInfo?origin=" + origin + "&destination=" + destination + "&date=" + date.ToString("yyyy-MM-dd HH:mm") + "&pax=" + pax + "&aircompany=" + aircompany + "&number=" + number + "&now=" + DateTime.Now.ToString("yyyy-MM-dd HH:mm") + "&token=" + token;
+                    var response = await client.GetAsync(Uri);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string json = await response.Content.ReadAsStringAsync();
+                        FlightInfo result = JsonConvert.DeserializeObject<FlightInfo>(json);
+                        return result;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return new FlightInfo() { Alert = ex.Message + "..." + ex.StackTrace };
+            }
+            return new FlightInfo();
         }
 
         public static async Task<TokenCollection> ReturnToken(Request req)
