@@ -14,6 +14,7 @@ namespace StaffCommunity
         public ExtendedResult exres { get; set; }
         public sign_in Token { get; set; }
         public string Nickname { get; set; }
+        public TokenCollection TokenSet { get; set; }
     }
 
     public class sign_in
@@ -288,5 +289,19 @@ namespace StaffCommunity
     {
         public List<long> Main { get; set; }
         public List<long> Control { get; set; }
+    }
+
+    public enum ReportStatus
+    {
+        success = 0,
+        error = 1,
+        already_in_progress = 2,
+        already_in_progress_another = 3,
+    }
+
+    public class ReportRequestStatus
+    {
+        public ReportStatus Status { get; set; }
+        public string StatusName { get; set; }
     }
 }

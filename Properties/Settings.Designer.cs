@@ -59,22 +59,7 @@ namespace StaffCommunity.Properties {
                 this["BotToken"] = value;
             }
         }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("2")]
-        public int TimeoutReady
-        {
-            get
-            {
-                return ((int)(this["TimeoutReady"]));
-            }
-            set
-            {
-                this["TimeoutReady"] = value;
-            }
-        }
-
+        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("5")]
@@ -121,6 +106,54 @@ namespace StaffCommunity.Properties {
             set {
                 this["AgentControl"] = value;
             }
-        }       
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2")]
+        public int TimeoutReady {
+            get {
+                return ((int)(this["TimeoutReady"]));
+            }
+            set {
+                this["TimeoutReady"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("10")]
+        public int TokensFor_1_week_sub {
+            get {
+                return ((int)(this["TokensFor_1_week_sub"]));
+            }
+            set {
+                this["TokensFor_1_week_sub"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("20")]
+        public int TokensFor_1_month_sub {
+            get {
+                return ((int)(this["TokensFor_1_month_sub"]));
+            }
+            set {
+                this["TokensFor_1_month_sub"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("5")]
+        public int TokensFor_3_day_sub {
+            get {
+                return ((int)(this["TokensFor_3_day_sub"]));
+            }
+            set {
+                this["TokensFor_3_day_sub"] = value;
+            }
+        }
     }
 }

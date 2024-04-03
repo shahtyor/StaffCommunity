@@ -843,6 +843,24 @@ namespace StaffCommunity
             return new ProfileTokens();
         }
 
+        public static async Task<TokenCollection> PremiumSub(string id_user, int days)
+        {
+            TokenCollection result = new TokenCollection();
+
+            using (HttpClient client = GetClient())
+            {
+                string Uri = Properties.Settings.Default.UrlApi + "/token/PremiumGrant?id_user=" + id_user + "&duration_days=" + days;
+                var response = await client.GetAsync(Uri);
+                if (response.IsSuccessStatusCode)
+                {
+                    string json = await response.Content.ReadAsStringAsync();
+                    result = JsonConvert.DeserializeObject<TokenCollection>(json);
+                }
+            }
+
+            return result;
+        }
+
         public static async Task<FlightInfo> GetFlightInfo(string origin, string destination, DateTime date, int pax, string aircompany, string number, string token = "void token")
         {
             try
@@ -864,6 +882,52 @@ namespace StaffCommunity
                 return new FlightInfo() { Alert = ex.Message + "..." + ex.StackTrace };
             }
             return new FlightInfo();
+        }
+
+        public static async Task<TokenCollection> DebtToken(string id_user, string type, string operation)
+        {
+            try
+            {
+                using (HttpClient client = GetClient())
+                {
+                    string Uri = Properties.Settings.Default.UrlApi + "/token/DebtToken?id_user=" + id_user + "&type=" + type + "&operation=" + operation + "&amount=0";
+                    var response = await client.GetAsync(Uri);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string json = await response.Content.ReadAsStringAsync();
+                        TokenCollection result = JsonConvert.DeserializeObject<TokenCollection>(json);
+                        return result;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return new TokenCollection() { Error = ex.Message + "..." + ex.StackTrace };
+            }
+            return new TokenCollection();
+        }
+
+        public static async Task<TokenCollection> CredToken(string id_user, string type, string operation, int amount)
+        {
+            try
+            {
+                using (HttpClient client = GetClient())
+                {
+                    string Uri = Properties.Settings.Default.UrlApi + "/token/CredToken?id_user=" + id_user + "&type=" + type + "&operation=" + operation + "&amount=" + amount;
+                    var response = await client.GetAsync(Uri);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string json = await response.Content.ReadAsStringAsync();
+                        TokenCollection result = JsonConvert.DeserializeObject<TokenCollection>(json);
+                        return result;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return new TokenCollection() { Error = ex.Message + "..." + ex.StackTrace };
+            }
+            return new TokenCollection();
         }
 
         public static async Task<TokenCollection> ReturnToken(Request req)

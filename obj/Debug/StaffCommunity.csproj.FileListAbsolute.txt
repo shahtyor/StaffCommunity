@@ -3,9 +3,11 @@ F:\StaffCommunity\StaffCommunity\bin\Debug\StaffCommunity.exe
 F:\StaffCommunity\StaffCommunity\bin\Debug\StaffCommunity.pdb
 F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Bcl.AsyncInterfaces.dll
 F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Bcl.HashCode.dll
+F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Extensions.DependencyInjection.Abstractions.dll
 F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Extensions.Logging.Abstractions.dll
 F:\StaffCommunity\StaffCommunity\bin\Debug\Newtonsoft.Json.dll
 F:\StaffCommunity\StaffCommunity\bin\Debug\Npgsql.dll
+F:\StaffCommunity\StaffCommunity\bin\Debug\RestSharp.dll
 F:\StaffCommunity\StaffCommunity\bin\Debug\System.Buffers.dll
 F:\StaffCommunity\StaffCommunity\bin\Debug\System.Collections.Immutable.dll
 F:\StaffCommunity\StaffCommunity\bin\Debug\System.ComponentModel.Annotations.dll
@@ -21,9 +23,11 @@ F:\StaffCommunity\StaffCommunity\bin\Debug\System.ValueTuple.dll
 F:\StaffCommunity\StaffCommunity\bin\Debug\Telegram.Bot.dll
 F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Bcl.AsyncInterfaces.xml
 F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Bcl.HashCode.xml
+F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Extensions.DependencyInjection.Abstractions.xml
 F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Extensions.Logging.Abstractions.xml
 F:\StaffCommunity\StaffCommunity\bin\Debug\Newtonsoft.Json.xml
 F:\StaffCommunity\StaffCommunity\bin\Debug\Npgsql.xml
+F:\StaffCommunity\StaffCommunity\bin\Debug\RestSharp.xml
 F:\StaffCommunity\StaffCommunity\bin\Debug\System.Buffers.xml
 F:\StaffCommunity\StaffCommunity\bin\Debug\System.Collections.Immutable.xml
 F:\StaffCommunity\StaffCommunity\bin\Debug\System.Diagnostics.DiagnosticSource.xml
@@ -41,10 +45,6 @@ F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCommunity.csproj.AssemblyReferen
 F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCommunity.ProjectInstaller.resources
 F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCommunity.csproj.GenerateResource.cache
 F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCommunity.csproj.CoreCompileInputs.cache
+F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCom.61823235.Up2Date
 F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCommunity.exe
 F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCommunity.pdb
-F:\StaffCommunity\StaffCommunity\bin\Debug\RestSharp.dll
-F:\StaffCommunity\StaffCommunity\bin\Debug\RestSharp.xml
-F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Extensions.DependencyInjection.Abstractions.dll
-F:\StaffCommunity\StaffCommunity\bin\Debug\Microsoft.Extensions.DependencyInjection.Abstractions.xml
-F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCom.61823235.Up2Date
