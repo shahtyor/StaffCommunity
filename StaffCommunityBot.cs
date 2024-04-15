@@ -1,11 +1,16 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Runtime.Caching;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Security.Policy;
+using System.Security.Principal;
 using System.ServiceProcess;
 using System.Threading;
 using System.Threading.Tasks;
@@ -263,7 +268,7 @@ namespace StaffCommunity
                     string mestext1 = "";
                     if (type == CancelType.Void)
                     {
-                        mestext1 = "Request processing timeout!";
+                        mestext1 = "Request processing timeout! Your balance: " + (rt.SubscribeTokens + rt.NonSubscribeTokens) + " token(s)";
                     }
                     else
                     {
@@ -316,15 +321,21 @@ namespace StaffCommunity
                         }
                     }
 
-                    //eventLogBot.WriteEntry("key:User=" + userid.Value);
-
-                    /*string commready = "";
-                    var readyexist = cache.Contains("Ready" + userid.Value);
-                    if (readyexist) commready = (string)cache.Get("Ready" + userid.Value);*/
-
-                    //eventLogBot.WriteEntry("Message: " + message?.Text);
-
-                    //var msg = message?.Text?.Split(' ')[0];
+                    var ruleText = "Welcome to the Staff Airlines, agents!" + Environment.NewLine +
+                        "This bot is special tool for agents. Agents — airline employees who can provide accurate flight load data to help their colleagues use SA benefits." + Environment.NewLine +
+                        "To get started, you need to link your Telegram account with your profile in the Staff Airlines app. After this, you will receive requests from users for your airline's flights. " +
+                        "For each answer you will receive a reward - 1 token. " +
+                        "You can use the received tokens for your requests in the Staff Airlines app or in Staff Airlines Search telegram bot (@StaffAirlinesSearchBot). Or you can purchase a premium subscription Staff Airlines with the <b>/sub</b> command." + Environment.NewLine +
+                        "Premium subscription cost:" + Environment.NewLine +
+                        "20 tokens for 1 month." + Environment.NewLine +
+                        "10 tokens for 1 week." + Environment.NewLine +
+                        "5 tokens for 3 days." + Environment.NewLine + Environment.NewLine +
+                        "Main commands:" + Environment.NewLine +
+                        "<b>/sub</b> purchase Premium subscription" + Environment.NewLine +
+                        "<b>/profile</b> link your telegram account with your Staff Airlines profile " + Environment.NewLine +
+                        "<b>/nick</b> change your callsigh" + Environment.NewLine +
+                        "<b>/preset</b> change your airline" + Environment.NewLine +
+                        "<b>/help</b> description of all commands";
 
                     try
                     {
@@ -335,13 +346,6 @@ namespace StaffCommunity
 
                         if (message?.Text?.ToLower() == "/start")
                         {
-                            var ruleText = "This bot is tool for agents - airline employees who can provide accurate flight load data to help their colleagues use SA benefits." + Environment.NewLine +
-                                           "To get started, you need to link your telegram account with your profile in the Staff Airlines app. After this, you will receive requests from users for your airline's flights. For each answer you will receive a reward - 1 token." + Environment.NewLine +
-                                           "You can use the received tokens for your requests in the Staff Airlines app or in Staff Airlines Search telegram bot (@StaffAirlinesSearchBot). Or you can purchase a premium subscription Staff Airlines with the /sub command." + Environment.NewLine +
-                                           "Premium subscription cost:" + Environment.NewLine + "20 tokens for 1 month." + Environment.NewLine + "10 tokens for 1 week." + Environment.NewLine + "5 tokens for 3 days." + Environment.NewLine + Environment.NewLine +
-                                           "Main commands:" + Environment.NewLine + "/sub purchasing a premium subscription Staff Airlines" + Environment.NewLine + "/profile link your telegram account with your Staff Airlines profile" + Environment.NewLine +
-                                           "/nick change your nickname" + Environment.NewLine + "/preset change your airline" + Environment.NewLine + "/help this short description" + Environment.NewLine;
-
                             await botClient.SendTextMessageAsync(message.Chat, ruleText, null, parseMode: ParseMode.Html);
 
                             if (user.Token == null)
@@ -352,7 +356,7 @@ namespace StaffCommunity
                             }
                             else if (string.IsNullOrEmpty(user.Nickname))
                             {
-                                await botClient.SendTextMessageAsync(message.Chat, "Enter your nickname:");
+                                await botClient.SendTextMessageAsync(message.Chat, "Specify your callsign." + Environment.NewLine + "It can be your real name or just a nickname:");
 
                                 UpdateCommandInCache(userid.Value, "enternick");
                             }
@@ -364,9 +368,15 @@ namespace StaffCommunity
                             }
                             else
                             {
-                                await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac + Environment.NewLine + "Your nickname: " + user.Nickname + Environment.NewLine + "Status: Online. Waiting for requests...");                                
+                                string nameac = Methods.TestAC(user.own_ac);
+                                await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent callsign: " + user.Nickname + Environment.NewLine + "Agent is online. Waiting for requests...");                                
                             }
 
+                            return;
+                        }
+                        else if (message?.Text?.ToLower() == "/help")
+                        {
+                            await botClient.SendTextMessageAsync(message.Chat, ruleText, parseMode: ParseMode.Html);
                             return;
                         }
                         else if (message?.Text?.ToLower() == "/profile")
@@ -387,7 +397,7 @@ namespace StaffCommunity
                         }
                         else if (message?.Text?.ToLower() == "/nick")
                         {
-                            await botClient.SendTextMessageAsync(message.Chat, "Enter your nickname:");
+                            await botClient.SendTextMessageAsync(message.Chat, "Specify your callsign." + Environment.NewLine + "It can be your real name or just a nickname:");
 
                             UpdateCommandInCache(userid.Value, "enternick");
 
@@ -452,14 +462,15 @@ namespace StaffCommunity
 
                                     if (!string.IsNullOrEmpty(user.own_ac))
                                     {
-                                        await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac);
+                                        string nameac = Methods.TestAC(user.own_ac);
+                                        await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + user.own_ac + ")");
                                     }
 
                                     cache.Remove("User" + message.Chat.Id);
 
                                     if (string.IsNullOrEmpty(user.Nickname))
                                     {
-                                        await botClient.SendTextMessageAsync(message.Chat, "Enter your nickname:");
+                                        await botClient.SendTextMessageAsync(message.Chat, "Specify your callsign." + Environment.NewLine + "It can be your real name or just a nickname:");
 
                                         UpdateCommandInCache(userid.Value, "enternick");
                                     }
@@ -513,7 +524,7 @@ namespace StaffCommunity
                                     user.Nickname = message.Text;
                                     UpdateUserInCache(user);
                                     cache.Remove("User" + message.Chat.Id);
-                                    await botClient.SendTextMessageAsync(message.Chat, "Your nickname: " + user.Nickname + "!");
+                                    await botClient.SendTextMessageAsync(message.Chat, "Agent callsign: " + user.Nickname + "!");
 
                                     if (user.own_ac == "??")
                                     {
@@ -523,7 +534,7 @@ namespace StaffCommunity
                                     }
                                     else
                                     {
-                                        await botClient.SendTextMessageAsync(message.Chat, "Status: Online. Waiting for requests...");
+                                        await botClient.SendTextMessageAsync(message.Chat, "Agent is online. Waiting for requests...");
                                     }
                                 }
                                 else
@@ -533,7 +544,7 @@ namespace StaffCommunity
                             }
                             else
                             {
-                                await botClient.SendTextMessageAsync(message.Chat, "This nickname is already in use by another agent. Please choose another one:");
+                                await botClient.SendTextMessageAsync(message.Chat, "This callsign is already in use by another agent. Please choose another one:");
                             }
                         }                        
 
@@ -542,8 +553,8 @@ namespace StaffCommunity
                             //eventLogBot.WriteEntry("command preset");
 
                             var ac = message.Text;
-                            var test = Methods.TestAC(ac.ToUpper());
-                            if (test > 0)
+                            var nameac = Methods.TestAC(ac.ToUpper());
+                            if (!string.IsNullOrEmpty(nameac))
                             {
                                 try
                                 {
@@ -562,7 +573,7 @@ namespace StaffCommunity
 
                                 cache.Remove("User" + message.Chat.Id);
 
-                                await botClient.SendTextMessageAsync(message.Chat, "Airline: " + ac.ToUpper() + Environment.NewLine + "Status: Online. Waiting for requests...");
+                                await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + ac.ToUpper() + ")" + Environment.NewLine + "Status: Online. Waiting for requests...");
                             }
                             else
                             {
@@ -599,7 +610,7 @@ namespace StaffCommunity
                                 }
                                 else
                                 {
-                                    await botClient.SendTextMessageAsync(message.Chat, "Enter the number of seats!");
+                                    await botClient.SendTextMessageAsync(message.Chat, "Please enter a positive or negative number!");
                                 }
                                 return;
                             }
@@ -621,7 +632,7 @@ namespace StaffCommunity
                                 }
                                 else
                                 {
-                                    await botClient.SendTextMessageAsync(message.Chat, "Enter the number of seats!");
+                                    await botClient.SendTextMessageAsync(message.Chat, "Please enter a positive or negative number!");
                                 }
                                 return;
                             }
@@ -644,7 +655,7 @@ namespace StaffCommunity
                                     eventLogBot.WriteEntry("finished request id=" + id_req);
                                     Methods.DelMessageParameters(id_req);
 
-                                    await botClient.SendTextMessageAsync(message.Chat, req.Desc_fligth + Environment.NewLine + "Economy class: " + req.Economy_count.Value + " seats" + Environment.NewLine + "Business class: " + req.Business_count.Value + " seats" + Environment.NewLine + "SA passengers: " + req.SA_count.Value, null, Telegram.Bot.Types.Enums.ParseMode.Html);
+                                    await botClient.SendTextMessageAsync(message.Chat, req.Desc_fligth + Environment.NewLine + "Classes available: Economy:" + req.Economy_count.Value + " Business:" + req.Business_count.Value + " SA:" + req.SA_count.Value, null, ParseMode.Html);
 
                                     if (req.Source == 1)
                                     {
@@ -654,7 +665,7 @@ namespace StaffCommunity
                                     else
                                     {
                                         var u = Methods.GetUser(req.Id_requestor);
-                                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), req.Desc_fligth + Environment.NewLine + "Economy class: " + req.Economy_count.Value + " seats" + Environment.NewLine + "Business class: " + req.Business_count.Value + " seats" + Environment.NewLine + "SA passengers: " + req.SA_count.Value + Environment.NewLine + Environment.NewLine + "Processing is finished!", null, Telegram.Bot.Types.Enums.ParseMode.Html);
+                                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), req.Desc_fligth + Environment.NewLine + "Classes available: Economy:" + req.Economy_count.Value + " Business:" + req.Business_count.Value + " SA:" + req.SA_count.Value + " (agent just reported this)", null, ParseMode.Html);
                                     }
 
                                     var Coll = await Methods.CredToken(CombineUserId(user));
@@ -663,7 +674,7 @@ namespace StaffCommunity
                                 }
                                 else
                                 {
-                                    await botClient.SendTextMessageAsync(message.Chat, "Enter the number of seats!");
+                                    await botClient.SendTextMessageAsync(message.Chat, "Please enter a positive or negative number!");
                                 }
                                 return;
                             }
@@ -820,11 +831,11 @@ namespace StaffCommunity
                                         string txt = "";
                                         if (status == 2 || status == 4)
                                         {
-                                            txt = "Request in processing";
+                                            txt = "Sorry, but the request has just been taken by another agent";
                                         }
                                         else
                                         {
-                                            txt = "Request completed";
+                                            txt = "Sorry, but the request has just been taken by another agent";
                                         }
                                         await botClient.SendTextMessageAsync(callbackquery.Message.Chat, txt);
                                     }
@@ -851,7 +862,7 @@ namespace StaffCommunity
                                             },
                                         });
 
-                                        var tmes = await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "The following query is selected:" + Environment.NewLine + Environment.NewLine + request.Desc_fligth, null, Telegram.Bot.Types.Enums.ParseMode.Html, replyMarkup: replyKeyboardMarkup);
+                                        var tmes = await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "You have " + Properties.Settings.Default.TimeoutVoid + " minutes to respond:" + Environment.NewLine + Environment.NewLine + request.Desc_fligth, null, ParseMode.Html, replyMarkup: replyKeyboardMarkup);
                                         Methods.SaveMessageParameters(tmes.Chat.Id, tmes.MessageId, id, 1);
                                         eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tmes.Chat.Id + ", MessageId=" + tmes.MessageId + ", req.Id=" + id + ", type=1");
 
@@ -864,7 +875,7 @@ namespace StaffCommunity
                                         {
                                             var u = Methods.GetUser(request.Id_requestor);
                                             eventLogBot.WriteEntry("GetUser. Id_requestor=" + request.Id_requestor + ", User=" + Newtonsoft.Json.JsonConvert.SerializeObject(u));
-                                            await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "Request " + request.Number_flight + " " + request.Origin + "-" + request.Destination + " at " + request.DepartureDateTime.ToString("dd-MM-yyyy HH:m") + " taken to work!");
+                                            await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "The request " + request.Number_flight + " " + request.Origin + "-" + request.Destination + " at " + request.DepartureDateTime.ToString("dd-MM-yyyy HH:mm") + " has been taken by " + user.Nickname);
                                         }
                                     }
                                 }
@@ -889,17 +900,17 @@ namespace StaffCommunity
                             eventLogBot.WriteEntry("cancel request id=" + id_request);
 
                             cache.Remove("User" + userid.Value);
-                            await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "Request canceled!");
+                            await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "Request has been canceled!");
 
                             if (request.Source == 1)
                             {
-                                var res = Methods.PushStatusRequest(request, "Request canceled");
+                                var res = Methods.PushStatusRequest(request, "Request has been canceled!");
                                 eventLogBot.WriteEntry("Push. " + res);
                             }
                             else
                             {
                                 var u = Methods.GetUser(request.Id_requestor);
-                                await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "The agent " + user.Nickname + " refused to take your request " + request.Number_flight + " " + request.Origin + "-" + request.Destination + " at " + request.DepartureDateTime.ToString("dd-MM-yyyy HH:m") + "!");
+                                await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "The agent " + user.Nickname + " refused to take your request " + request.Number_flight + " " + request.Origin + "-" + request.Destination + " at " + request.DepartureDateTime.ToString("dd-MM-yyyy HH:mm") + "!");
                             }
                         }
                         else if (message.Substring(0, 6) == "/ready")

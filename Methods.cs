@@ -343,9 +343,9 @@ namespace StaffCommunity
             return result;
         }
 
-        public static int TestAC(string ac)
+        public static string TestAC(string ac)
         {
-            int result = 0;
+            string result = null;
             NpgsqlCommand com = new NpgsqlCommand("select * from airlines where code=@ac", conn);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = ac });
             try
@@ -353,7 +353,7 @@ namespace StaffCommunity
                 NpgsqlDataReader reader = com.ExecuteReader();
                 if (reader.Read())
                 {
-                    result = (int)reader["id"];
+                    result = reader["name"].ToString();
                 }
 
                 reader.Close();
@@ -364,8 +364,7 @@ namespace StaffCommunity
             }
             catch (Exception ex)
             {
-                string s = "123";
-                return 0;
+                return null;
             }
         }
 
@@ -720,7 +719,7 @@ namespace StaffCommunity
                 WebRequest tRequest = WebRequest.Create("https://fcm.googleapis.com/fcm/send");
                 tRequest.Method = "post";
                 tRequest.ContentType = "application/json";
-                var data = new
+                object data = new
                 {
                     to = deviceId,
                     priority = "high",
