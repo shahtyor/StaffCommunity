@@ -71,7 +71,7 @@ namespace StaffCommunity
 
                         if (reader.Read())
                         {
-                            user = new telegram_user() { first_use = (DateTime)reader["first_use"], own_ac = (new_ac == "??" ? reader["own_ac"].ToString() : new_ac), is_reporter = true, is_requestor = (bool)reader["is_requestor"], Token = token };
+                            user = new telegram_user() { first_use = (DateTime)reader["first_use"], own_ac = (new_ac == "??" ? reader["own_ac"].ToString() : new_ac), is_reporter = true, is_requestor = (bool)reader["is_requestor"], Token = token, Nickname = reader["nickname"].ToString() };
                             if (user.id == null)
                             {
                                 user.id = id;
@@ -80,6 +80,15 @@ namespace StaffCommunity
                             reader.Close();
                             reader.Dispose();
                             com.Dispose();
+
+                            if (new_ac != "??" && !string.IsNullOrEmpty(user.Nickname))
+                            {
+                                // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
+                                string DataJson = "[{\"user_id\":\"" + token.type + "_" + token.id_user + "\", \"event_type\":\"tg new agent\"," +
+                                    "\"user_properties\":{\"is_agent\":\"yes\"," +
+                                    "\"ac\":\"" + new_ac + "\", \"nick\":\"" + user.Nickname + "\"}}]";
+                                var task = Task.Run(async () => await Methods.AmplitudePOST(DataJson));
+                            }
 
                             NpgsqlCommand com3 = new NpgsqlCommand("update telegram_user set is_reporter=@is_reporter, id=@id, own_ac=@own_ac where id_user=@id_user", conn);
                             com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
@@ -98,6 +107,12 @@ namespace StaffCommunity
                                 eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace);
                             }
                             com3.Dispose();
+
+                            // отправляем событие «успешная линковка» в амплитуд
+                            string DataJson2 = "[{\"user_id\":\"" + token.type + "_" + token.id_user + "\", \"event_type\":\"tg link profile\"," +
+                                "\"event_properties\":{\"bot\":\"ab\",\"system\":\"" + (token.type == 1 ? "apple" : "google") + "\"}," +
+                                "\"user_properties\":{\"id_telegram\":" + id + ",\"is_agent\":\"yes\",\"ac\":\"" + new_ac + "\"}}]";
+                            var task2 = Task.Run(async () => await Methods.AmplitudePOST(DataJson2));
 
                             if (new_ac != "??")
                             {
@@ -130,6 +145,12 @@ namespace StaffCommunity
                                 eventLogBot.WriteEntry(ex.Message + "..." + e);
                             }
                             com2.Dispose();
+
+                            // отправляем событие «успешная линковка» в амплитуд
+                            string DataJson2 = "[{\"user_id\":\"" + id + "\", \"event_type\":\"tg link profile\"," +
+                                "\"event_properties\":{\"bot\":\"ab\",\"system\":\"" + (token.type == 1 ? "apple" : "google") + "\"}," +
+                                "\"user_properties\":{\"customer_id\":\"" + token.type + "_" + token.id_user + "\",\"ac\":\"" + new_ac + "\"}}]";
+                            var task2 = Task.Run(async () => await Methods.AmplitudePOST(DataJson2));
 
                             if (new_ac != "??")
                             {
@@ -236,6 +257,15 @@ namespace StaffCommunity
                 }
                 if (!user.is_reporter)
                 {
+                    if (user.own_ac != "??" && !string.IsNullOrEmpty(user.Nickname) && !string.IsNullOrEmpty(id_user))
+                    {
+                        // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
+                        string DataJson = "[{\"user_id\":\"" + id_user + "\", \"event_type\":\"tg new agent\"," +
+                            "\"user_properties\":{\"is_agent\":\"yes\"," +
+                            "\"ac\":\"" + user.own_ac + "\", \"nick\":\"" + user.Nickname + "\"}}]";
+                        var task = Task.Run(async () => await Methods.AmplitudePOST(DataJson));
+                    }
+
                     NpgsqlCommand com2 = new NpgsqlCommand("update telegram_user set is_reporter=@is_reporter where id=@id");
                     com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
                     com.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = true });
@@ -449,7 +479,7 @@ namespace StaffCommunity
                     string time_flight = reader["time_flight"].ToString();
                     string Id_reporter = reader["id_reporter"].ToString();
                     DateTime DepartureDateTime = new DateTime(int.Parse(date_flight.Substring(4, 2)) + 2000, int.Parse(date_flight.Substring(2, 2)), int.Parse(date_flight.Substring(0, 2)), int.Parse(time_flight.Substring(0, 2)), int.Parse(time_flight.Substring(2, 2)), 0);
-                    Request request = new Request() { Id = (long)reader["id"], Id_group = (long)reader["id_group"], Version_request = (short)reader["version_request"], Id_requestor = reader["id_requestor"].ToString(), Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Operating = reader["operating"].ToString(), Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString(), Pax = (short)reader["pax"] };
+                    Request request = new Request() { Id = (long)reader["id"], Id_group = (long)reader["id_group"], Version_request = (short)reader["version_request"], Id_requestor = reader["id_requestor"].ToString(), Origin = reader["origin"].ToString(), Destination = reader["destination"].ToString(), DepartureDateTime = DepartureDateTime, Operating = reader["operating"].ToString(), Number_flight = reader["number_flight"].ToString(), Desc_fligth = reader["desc_flight"].ToString(), Pax = (short)reader["pax"], TS_create = (DateTime)reader["ts_create"] };
                     if (!string.IsNullOrEmpty(Id_reporter))
                     {
                         request.Id_reporter = Id_reporter;
@@ -585,6 +615,8 @@ namespace StaffCommunity
                     result.Id_reporter = reader["id_reporter"].ToString();
                     result.Id_group = (long)reader["id_group"];
                     result.Version_request = (short)reader["version_request"];
+                    result.Operating = reader["operating"].ToString();
+                    result.TS_create = (DateTime)reader["ts_create"];
                 }
             }
             com.Dispose();
@@ -854,6 +886,26 @@ namespace StaffCommunity
                 {
                     string json = await response.Content.ReadAsStringAsync();
                     result = JsonConvert.DeserializeObject<TokenCollection>(json);
+
+                    var vpi = "";
+                    if (days == 3)
+                    {
+                        vpi = "3_day_sub_agent";
+                    }
+                    else if (days == 7)
+                    {
+                        vpi = "1_week_sub_agent";
+                    }
+                    else
+                    {
+                        vpi = "1_month_sub_agent";
+                    }
+
+                    //агент купил подписку
+                    string DataJson = "[{\"user_id\":\"" + id_user + "\", \"event_type\":\"tg agent buy subscription\"," +
+                        "\"user_properties\":{\"paidStatus\":\"premiumAccess\"}," +
+                        "\"event_properties\":{\"subscription\":\"" + vpi + "\"}}]";
+                    var r = await AmplitudePOST(DataJson);
                 }
             }
 

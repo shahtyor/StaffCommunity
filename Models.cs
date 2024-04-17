@@ -252,6 +252,7 @@ namespace StaffCommunity
         public int SubscribeTokens { get; set; }
         public int PaidTokens { get; set; }
         public short Pax { get; set; }
+        public DateTime TS_create { get; set; }
     }
 
     public class RequestType

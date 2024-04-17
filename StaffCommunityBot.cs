@@ -162,7 +162,7 @@ namespace StaffCommunity
                     {
                         new[]
                         {
-                            InlineKeyboardButton.WithCallbackData("Take request", "/take " + req.Id),
+                            InlineKeyboardButton.WithCallbackData("Reply to request", "/take " + req.Id),
                         },
                     });
 
@@ -185,18 +185,32 @@ namespace StaffCommunity
                     {
                         foreach (var rep in repgroup.Main)
                         {
-                            Message tm = await bot.SendTextMessageAsync(new ChatId(rep), req.Desc_fligth, null, Telegram.Bot.Types.Enums.ParseMode.Html, replyMarkup: ikm);
+                            Message tm = await bot.SendTextMessageAsync(new ChatId(rep), req.Desc_fligth, null, ParseMode.Html, replyMarkup: ikm);
                             Methods.SaveMessageParameters(tm.Chat.Id, tm.MessageId, req.Id, 0);
 
                             eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tm.Chat.Id + ", MessageId=" + tm.MessageId + ", req.Id=" + req.Id + ", type=0");
+
+                            var agent = Methods.GetUser(rep);
+
+                            //показали в чате агенту новый запрос
+                            string DataJson = "[{\"user_id\":\"" + agent.Token.type + "_" + agent.Token.id_user + "\", \"event_type\":\"tg agent show request\"," +
+                                "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"version of request\":\"main\",\"requestor\":\"" + req.Id_requestor + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
+                            var r = await Methods.AmplitudePOST(DataJson);
                         }
                     }
                     else
                     {
                         foreach (var rep in repgroup.Control)
                         {
-                            Message tm = await bot.SendTextMessageAsync(new ChatId(rep), req.Desc_fligth, null, Telegram.Bot.Types.Enums.ParseMode.Html, replyMarkup: ikm);
+                            Message tm = await bot.SendTextMessageAsync(new ChatId(rep), req.Desc_fligth, null, ParseMode.Html, replyMarkup: ikm);
                             Methods.SaveMessageParameters(tm.Chat.Id, tm.MessageId, req.Id, 0);
+
+                            var agent = Methods.GetUser(rep);
+
+                            //показали в чате агенту новый запрос
+                            string DataJson = "[{\"user_id\":\"" + agent.Token.type + "_" + agent.Token.id_user + "\", \"event_type\":\"tg agent show request\"," +
+                                "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"version of request\":\"control\",\"requestor\":\"" + req.Id_requestor + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
+                            var r = await Methods.AmplitudePOST(DataJson);
                         }
                     }
                 }
@@ -266,13 +280,21 @@ namespace StaffCommunity
 
                     // Сообщение реквестору
                     string mestext1 = "";
+                    string mestext2 = "";
                     if (type == CancelType.Void)
                     {
-                        mestext1 = "Request processing timeout! Your balance: " + (rt.SubscribeTokens + rt.NonSubscribeTokens) + " token(s)";
+                        mestext1 = "Your request " + req.Number_flight + " " + req.Origin + "-" + req.Destination + " at " + req.DepartureDateTime.ToString("dd-MM-yyyy HH:mm") + " has expired. You can send your request again. Your balance: " + (rt.SubscribeTokens + rt.NonSubscribeTokens) + " token(s)";
+                        mestext2 = "Your request has expired";
+
+                        //при направлении клиенту сообщения, что запрос протух
+                        string DataJson = "[{\"user_id\":\"" + req.Id_requestor + "\", \"event_type\":\"tg user request expired message\"," +
+                            "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"platform\":\"telegram\"}}]";
+                        var r = await Methods.AmplitudePOST(DataJson);
                     }
                     else
                     {
                         mestext1 = "The agent " + urep.Nickname + " didn't reply to your request " + req.Number_flight + " " + req.Origin + "-" + req.Destination + " at " + req.DepartureDateTime.ToString("dd-MM-yyyy HH:mm") + " in time!";
+                        mestext2 = "The agent " + urep.Nickname + " didn't reply to your request in time";
                     }
 
                     if (req.Source == 0)
@@ -282,7 +304,7 @@ namespace StaffCommunity
                     }
                     else
                     {
-                        var res = Methods.PushStatusRequest(req, mestext1);
+                        var res = Methods.PushStatusRequest(req, mestext2);
                         eventLogBot.WriteEntry("Timeout. " + res);
                     }
                 }
@@ -327,14 +349,14 @@ namespace StaffCommunity
                         "For each answer you will receive a reward - 1 token. " +
                         "You can use the received tokens for your requests in the Staff Airlines app or in Staff Airlines Search telegram bot (@StaffAirlinesSearchBot). Or you can purchase a premium subscription Staff Airlines with the <b>/sub</b> command." + Environment.NewLine +
                         "Premium subscription cost:" + Environment.NewLine +
-                        "20 tokens for 1 month." + Environment.NewLine +
-                        "10 tokens for 1 week." + Environment.NewLine +
-                        "5 tokens for 3 days." + Environment.NewLine + Environment.NewLine +
+                        Properties.Settings.Default.TokensFor_1_month_sub + " tokens for 1 month." + Environment.NewLine +
+                        Properties.Settings.Default.TokensFor_1_week_sub + " tokens for 1 week." + Environment.NewLine +
+                        Properties.Settings.Default.TokensFor_3_day_sub + " tokens for 3 days." + Environment.NewLine + Environment.NewLine +
                         "Main commands:" + Environment.NewLine +
                         "<b>/sub</b> purchase Premium subscription" + Environment.NewLine +
                         "<b>/profile</b> link your telegram account with your Staff Airlines profile " + Environment.NewLine +
                         "<b>/nick</b> change your callsigh" + Environment.NewLine +
-                        "<b>/preset</b> change your airline" + Environment.NewLine +
+                        "<b>/airline</b> change your airline" + Environment.NewLine +
                         "<b>/help</b> description of all commands";
 
                     try
@@ -344,12 +366,24 @@ namespace StaffCommunity
                             return;
                         }
 
+                        string idus = message.Chat.Id.ToString();
+                        if (user.Token != null)
+                        {
+                            idus = user.Token.type + "_" + user.Token.id_user;
+                        }
+
                         if (message?.Text?.ToLower() == "/start")
                         {
                             await botClient.SendTextMessageAsync(message.Chat, ruleText, null, parseMode: ParseMode.Html);
 
                             if (user.Token == null)
                             {
+                                // отправляем событие «первое появление  пользователя в поисковом боте (/start)» в амплитуд
+                                string DataJson = "[{\"user_id\":\"" + message.Chat.Id + "\", \"event_type\":\"tg ab join\"," +
+                                    "\"user_properties\":{\"is_agent\":\"no\"," +
+                                    "\"id_telegram\":\"" + message.Chat.Id + "\"}}]";
+                                var r = await Methods.AmplitudePOST(DataJson);
+
                                 await botClient.SendTextMessageAsync(message.Chat, "Enter the UID." + Environment.NewLine + "Generate and copy the UID from the Profile section of Staff Airlines app, after logging in:" + Environment.NewLine);
 
                                 UpdateCommandInCache(userid.Value, "entertoken");
@@ -369,7 +403,7 @@ namespace StaffCommunity
                             else
                             {
                                 string nameac = Methods.TestAC(user.own_ac);
-                                await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent callsign: " + user.Nickname + Environment.NewLine + "Agent is online. Waiting for requests...");                                
+                                await botClient.SendTextMessageAsync(message.Chat, "Agent callsign: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");                                
                             }
 
                             return;
@@ -383,13 +417,22 @@ namespace StaffCommunity
                         {
                             await botClient.SendTextMessageAsync(message.Chat, "Enter the UID." + Environment.NewLine + "Generate and copy the UID from the Profile section of Staff Airlines app, after logging in:" + Environment.NewLine);
 
+                            // отправляем событие «запрос uid для линковки профиля (/profile)» в амплитуд
+                            string DataJson = "[{\"user_id\":\"" + idus + "\", \"event_type\":\"tg start link profile\"," +
+                                "\"event_properties\":{\"bot\":\"ab\"}}]";
+                            var r = await Methods.AmplitudePOST(DataJson);
+
                             UpdateCommandInCache(userid.Value, "entertoken");
 
                             return;
                         }
-                        else if (message?.Text?.ToLower() == "/preset")
+                        else if (message?.Text?.ToLower() == "/airline")
                         {
                             await botClient.SendTextMessageAsync(message.Chat, "Specify your airline. Enter your airline's code (for example: AA):");
+
+                            string DataJson = "[{\"user_id\":\"" + idus + "\", \"event_type\":\"tg start set ac\"," +
+                                "\"event_properties\":{\"bot\":\"ab\"}}]";
+                            var r = await Methods.AmplitudePOST(DataJson);
 
                             UpdateCommandInCache(userid.Value, "preset");
 
@@ -412,6 +455,11 @@ namespace StaffCommunity
                             else
                             {
                                 var ProfTok = Methods.GetProfile(user.Token.type + "_" + user.Token.id_user).Result;
+
+                                string DataJson = "[{\"user_id\":\"" + user.Token.type + "_" + user.Token.id_user + "\", \"event_type\":\"void\"," +
+                                    "\"user_properties\":{\"paidStatus\":\"" + (ProfTok.Premium ? "premiumAccess" : "free plan") + "\"}}]";
+                                var r = await Methods.AmplitudePOST(DataJson);
+
                                 if (ProfTok.Premium)
                                 {
                                     await botClient.SendTextMessageAsync(message.Chat, "You already have an active subscription!");
@@ -423,13 +471,13 @@ namespace StaffCommunity
 
                                     var replyKeyboardMarkup = new InlineKeyboardMarkup(new[]
                                     {
-                                   new[]
-                                   {
-                                       InlineKeyboardButton.WithCallbackData("1 month", "/sub1month"),
-                                       InlineKeyboardButton.WithCallbackData("1 week", "/sub1week"),
-                                       InlineKeyboardButton.WithCallbackData("3 days", "/sub3day")
-                                   },
-                            });
+                                        new[]
+                                        {
+                                            InlineKeyboardButton.WithCallbackData("1 month", "/sub1month"),
+                                            InlineKeyboardButton.WithCallbackData("1 week", "/sub1week"),
+                                            InlineKeyboardButton.WithCallbackData("3 days", "/sub3day")
+                                        },
+                                    });
 
                                     await botClient.SendTextMessageAsync(message.Chat, "Select the premium subscription option:" + Environment.NewLine + 
                                         "   - 1 month for " + Properties.Settings.Default.TokensFor_1_month_sub + " tokens" + Environment.NewLine +
@@ -526,6 +574,10 @@ namespace StaffCommunity
                                     cache.Remove("User" + message.Chat.Id);
                                     await botClient.SendTextMessageAsync(message.Chat, "Agent callsign: " + user.Nickname + "!");
 
+                                    string DataJson = "[{\"user_id\":\"" + idus + "\", \"event_type\":\"tg set ac\"," +
+                                        "\"user_properties\":{\"nick\":\"" + user.Nickname + "\"}}]";
+                                    var r = await Methods.AmplitudePOST(DataJson);
+
                                     if (user.own_ac == "??")
                                     {
                                         await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code (for example: AA):");
@@ -573,7 +625,12 @@ namespace StaffCommunity
 
                                 cache.Remove("User" + message.Chat.Id);
 
-                                await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + ac.ToUpper() + ")" + Environment.NewLine + "Status: Online. Waiting for requests...");
+                                string DataJson = "[{\"user_id\":\"" + idus + "\", \"event_type\":\"tg set ac\"," +
+                                    "\"user_properties\":{\"ac\":\"" + ac.ToUpper() + "\"}," +
+                                    "\"event_properties\":{\"bot\":\"ab\"}}]";
+                                var r = await Methods.AmplitudePOST(DataJson);
+
+                                await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + ac.ToUpper() + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
                             }
                             else
                             {
@@ -652,6 +709,11 @@ namespace StaffCommunity
                                     Request req = Methods.GetRequestStatus(id_req);
                                     Methods.SetRequestStatus(5, req);
 
+                                    //агент отправил данные по загрузке
+                                    string DataJson0 = "[{\"user_id\":\"" + user.Token.type + "_" + user.Token.id_user + "\", \"event_type\":\"tg agent send info\"," +
+                                        "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"version of request\":\"main\",\"requestor\":\"" + req.Id_requestor + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
+                                    var r0 = await Methods.AmplitudePOST(DataJson0);
+
                                     eventLogBot.WriteEntry("finished request id=" + id_req);
                                     Methods.DelMessageParameters(id_req);
 
@@ -659,14 +721,19 @@ namespace StaffCommunity
 
                                     if (req.Source == 1)
                                     {
-                                        var res = Methods.PushStatusRequest(req, "Processing is finished");
+                                        var res = Methods.PushStatusRequest(req, "Economy:" + req.Economy_count.Value + " Business:" + req.Business_count.Value + " SA:" + req.SA_count.Value + " (agent " + user.Nickname + " just reported this)");
                                         eventLogBot.WriteEntry("Push. " + res);
                                     }
                                     else
                                     {
                                         var u = Methods.GetUser(req.Id_requestor);
-                                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), req.Desc_fligth + Environment.NewLine + "Classes available: Economy:" + req.Economy_count.Value + " Business:" + req.Business_count.Value + " SA:" + req.SA_count.Value + " (agent just reported this)", null, ParseMode.Html);
+                                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), req.Desc_fligth + Environment.NewLine + "Classes available: Economy:" + req.Economy_count.Value + " Business:" + req.Business_count.Value + " SA:" + req.SA_count.Value + " (agent " + user.Nickname + " just reported this)", null, ParseMode.Html);
                                     }
+
+                                    //при направлении клиенту сообщения с данными по загрузке от агента
+                                    string DataJson = "[{\"user_id\":\"" + req.Id_requestor + "\", \"event_type\":\"tg user agent  answer message\"," +
+                                        "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"agent\":\"" + user.Token.type + "_" + user.Token.id_user + "\",\"nick\":\"" + user.Nickname + "\",\"platform\":\"telegram\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
+                                    var r = await Methods.AmplitudePOST(DataJson);
 
                                     var Coll = await Methods.CredToken(CombineUserId(user));
 
@@ -815,7 +882,7 @@ namespace StaffCommunity
 
                                 if (!ta)
                                 {
-                                    await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "You already have a request in progress, complete it first!");
+                                    await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "You already have one request in the progress! An agent is able to process only one request at a time.");
                                 }
                                 else
                                 {
@@ -866,9 +933,14 @@ namespace StaffCommunity
                                         Methods.SaveMessageParameters(tmes.Chat.Id, tmes.MessageId, id, 1);
                                         eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tmes.Chat.Id + ", MessageId=" + tmes.MessageId + ", req.Id=" + id + ", type=1");
 
+                                        //агент взял запрос в работу
+                                        string DataJson0 = "[{\"user_id\":\"" + user.Token.type + "_" + user.Token.id_user + "\", \"event_type\":\"tg agent take request\"," +
+                                            "\"event_properties\":{\"ac\":\"" + request.Operating + "\",\"requestGroupID\":" + request.Id_group + ",\"version of request\":\"main\",\"requestor\":\"" + request.Id_requestor + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - request.TS_create).TotalSeconds) + "}}]";
+                                        var r0 = await Methods.AmplitudePOST(DataJson0);
+
                                         if (request.Source == 1)
                                         {
-                                            var res = Methods.PushStatusRequest(request, "Taken to work");
+                                            var res = Methods.PushStatusRequest(request, "The request has been taken by " + user.Nickname);
                                             eventLogBot.WriteEntry("Push. " + res);
                                         }
                                         else
@@ -877,6 +949,11 @@ namespace StaffCommunity
                                             eventLogBot.WriteEntry("GetUser. Id_requestor=" + request.Id_requestor + ", User=" + Newtonsoft.Json.JsonConvert.SerializeObject(u));
                                             await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "The request " + request.Number_flight + " " + request.Origin + "-" + request.Destination + " at " + request.DepartureDateTime.ToString("dd-MM-yyyy HH:mm") + " has been taken by " + user.Nickname);
                                         }
+
+                                        //при направлении клиенту сообщения, что агент взял запрос в работу
+                                        string DataJson = "[{\"user_id\":\"" + request.Id_requestor + "\", \"event_type\":\"tg user agent take request message\"," +
+                                            "\"event_properties\":{\"ac\":\"" + request.Operating + "\",\"requestGroupID\":" + request.Id_group + ",\"agent\":\"" + user.Token.type + "_" + user.Token.id_user + "\",\"nick\":\"" + user.Nickname + "\",\"platform\":\"telegram\",\"workTime\":" + Convert.ToInt32((DateTime.Now - request.TS_create).TotalSeconds) + "}}]";
+                                        var r = await Methods.AmplitudePOST(DataJson);
                                     }
                                 }
                             }
@@ -887,6 +964,11 @@ namespace StaffCommunity
                             var id_request = long.Parse(msg[1]);
                             var request = Methods.GetRequestStatus(id_request);
                             Methods.SetRequestStatus(3, request);
+
+                            //агент вернул запрос без выполнения
+                            string DataJson0 = "[{\"user_id\":\"" + user.Token.type + "_" + user.Token.id_user + "\", \"event_type\":\"tg agent return request\"," +
+                                "\"event_properties\":{\"ac\":\"" + request.Operating + "\",\"requestGroupID\":" + request.Id_group + ",\"version of request\":\"main\",\"requestor\":\"" + request.Id_requestor + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - request.TS_create).TotalSeconds) + "}}]";
+                            var r0 = await Methods.AmplitudePOST(DataJson0);
 
                             var mespar = Methods.GetMessageParameters(id_request, 1);
                             foreach (TelMessage tm in mespar)
@@ -904,7 +986,7 @@ namespace StaffCommunity
 
                             if (request.Source == 1)
                             {
-                                var res = Methods.PushStatusRequest(request, "Request has been canceled!");
+                                var res = Methods.PushStatusRequest(request, "The agent " + user.Nickname + " refused to take your request!");
                                 eventLogBot.WriteEntry("Push. " + res);
                             }
                             else
@@ -912,6 +994,11 @@ namespace StaffCommunity
                                 var u = Methods.GetUser(request.Id_requestor);
                                 await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "The agent " + user.Nickname + " refused to take your request " + request.Number_flight + " " + request.Origin + "-" + request.Destination + " at " + request.DepartureDateTime.ToString("dd-MM-yyyy HH:mm") + "!");
                             }
+
+                            //при направлении клиенту сообщения, что агент вернул запрос без исполнения
+                            string DataJson = "[{\"user_id\":\"" + request.Id_requestor + "\", \"event_type\":\"tg user agent return request message\"," +
+                                "\"event_properties\":{\"ac\":\"" + request.Operating + "\",\"requestGroupID\":" + request.Id_group + ",\"agent\":\"" + user.Token.type + "_" + user.Token.id_user + "\",\"nick\":\"" + user.Nickname + "\",\"platform\":\"telegram\",\"workTime\":" + Convert.ToInt32((DateTime.Now - request.TS_create).TotalSeconds) + "}}]";
+                            var r = await Methods.AmplitudePOST(DataJson);
                         }
                         else if (message.Substring(0, 6) == "/ready")
                         {
@@ -923,7 +1010,7 @@ namespace StaffCommunity
                             {
                                 var msg = message.Split(' ');
                                 var id_request = long.Parse(msg[1]);
-                                //var request = Methods.GetRequestStatus(id_request);
+                                var request = Methods.GetRequestStatus(id_request);
                                 Methods.SetRequestStatus(4, id_request, CombineUserId(user));
 
                                 var mespar = Methods.GetMessageParameters(id_request, 1);
@@ -933,6 +1020,11 @@ namespace StaffCommunity
                                 }
 
                                 eventLogBot.WriteEntry("ready request id=" + id_request + ", User=" + userid.Value);
+
+                                //агент готов вводить данные по загрузке
+                                string DataJson = "[{\"user_id\":\"" + user.Token.type + "_" + user.Token.id_user + "\", \"event_type\":\"tg agent ready request\"," +
+                                    "\"event_properties\":{\"ac\":\"" + request.Operating + "\",\"requestGroupID\":" + request.Id_group + ",\"version of request\":\"main\",\"requestor\":\"" + request.Id_requestor + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - request.TS_create).TotalSeconds) + "}}]";
+                                var r = await Methods.AmplitudePOST(DataJson);
 
                                 UpdateCommandInCache(userid.Value, "ready1/" + id_request);
                                 await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "Number of available seats in economy class:");
@@ -967,6 +1059,13 @@ namespace StaffCommunity
                     if (CM.Status == ChatMemberStatus.Kicked) // Заблокировал чат
                     {
                         Methods.UserBlockChat(userid.Value, AirlineAction.Delete);
+
+                        //пользователь покинул агентский бот
+                        string DataJson = "[{\"user_id\":\"" + user.Token.type + "_" + user.Token.id_user + "\", \"event_type\":\"tg left agent\"," +
+                            "\"user_properties\":{\"is_agent\":\"no\"}," +
+                            "\"event_properties\":{\"ac\":\"" + user.own_ac + "\"}}]";
+                        var r = await Methods.AmplitudePOST(DataJson);
+
                         if (user.own_ac != "??")
                         {
                             Methods.UpdateAirlinesReporter(user.own_ac, AirlineAction.Delete);
