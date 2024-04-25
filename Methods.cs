@@ -79,8 +79,11 @@ namespace StaffCommunity
 
                             if (!user.is_reporter || user.id == null)
                             {
+                                bool valueReporter = false;
                                 if (new_ac != "??" && !string.IsNullOrEmpty(user.Nickname))
                                 {
+                                    valueReporter = true;
+
                                     // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
                                     string DataJson = "[{\"user_id\":\"" + GetUserID(token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg new agent\"," +
                                         "\"user_properties\":{\"is_agent\":\"yes\"," +
@@ -90,7 +93,7 @@ namespace StaffCommunity
 
                                 NpgsqlCommand com3 = new NpgsqlCommand("update telegram_user set is_reporter=@is_reporter, id=@id, own_ac=@own_ac where id_user=@id_user", conn);
                                 com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
-                                com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = true });
+                                com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = valueReporter });
                                 com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "own_ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = new_ac });
                                 com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = GetUserID(token) });
 
@@ -142,7 +145,7 @@ namespace StaffCommunity
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "first_use", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Timestamp, Value = DateTime.Now });
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "own_ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = new_ac });
-                            com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = true });
+                            com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = false });
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_requestor", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = false });
                             com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = GetUserID(token) });
 
@@ -167,7 +170,7 @@ namespace StaffCommunity
 
                             DataJson2 = "[{\"user_id\":\"" + id + "\",\"platform\":\"Telegram\",\"event_type\":\"tg link profile\"," +
                                 "\"event_properties\":{\"bot\":\"ab\",\"system\":\"" + (token.type == 1 ? "apple" : "google") + "\"}," +
-                                "\"user_properties\":{\"customer_id\":\"" + GetUserID(token) + "\",\"ac\":\"" + new_ac + "\"}}]";
+                                "\"user_properties\":{\"customerID\":\"" + GetUserID(token) + "\",\"ac\":\"" + new_ac + "\"}}]";
                             r2 = AmplitudePOST(DataJson2);
 
                             if (new_ac != "??")
@@ -175,7 +178,7 @@ namespace StaffCommunity
                                 UpdateAirlinesReporter(new_ac, AirlineAction.Add);
                             }
 
-                            user = new telegram_user() { id = id, first_use = DateTime.Now, own_ac = new_ac, is_reporter = true, is_requestor = false, Token = token };
+                            user = new telegram_user() { id = id, first_use = DateTime.Now, own_ac = new_ac, is_reporter = false, is_requestor = false, Token = token };
                         }
                     }
                     catch (Exception ex)
@@ -194,13 +197,31 @@ namespace StaffCommunity
             return user;
         }
 
-        public static string SetNickname(string Nickname, string id_user)
+        public static string SetNickname(string Nickname, telegram_user user)
         {
             string alert = null;
 
-            NpgsqlCommand com = new NpgsqlCommand("update telegram_user set nickname=@nickname where id_user=@id_user", conn);
+            bool valueReporter = false;
+            if (!string.IsNullOrEmpty(user.own_ac) && user.own_ac != "??")
+            {
+                valueReporter = true;
+            }
+
+            string id_user = GetUserID(user.Token);
+
+            NpgsqlCommand com = new NpgsqlCommand("update telegram_user set nickname=@nickname, is_reporter=@is_reporter where id_user=@id_user", conn);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "nickname", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = Nickname });
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = id_user });
+            com.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = valueReporter });
+
+            if (!user.is_reporter)
+            {
+                // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
+                string DataJson = "[{\"user_id\":\"" + id_user + "\",\"platform\":\"Telegram\",\"event_type\":\"tg new agent\"," +
+                    "\"user_properties\":{\"is_agent\":\"yes\"," +
+                    "\"ac\":\"" + user.own_ac + "\", \"nick\":\"" + user.Nickname + "\"}}]";
+                var r = AmplitudePOST(DataJson);
+            }
 
             try
             {
@@ -239,7 +260,7 @@ namespace StaffCommunity
                     }
 
                     var id_user_arr = id_user.Split('_');
-                    user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), Token = new sign_in() { type = short.Parse(id_user_arr[0]), id_user = id_user_arr[1] } };
+                    user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), is_reporter = (bool)reader["is_reporter"], Token = new sign_in() { type = short.Parse(id_user_arr[0]), id_user = id_user_arr[1] } };
 
                     cache.Add(keyus, user, policyuser);
                 }
@@ -267,16 +288,23 @@ namespace StaffCommunity
                 {
                     iid = long.Parse(sid);
                 }
-                user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), is_reporter = true, is_requestor = (bool)reader["is_requestor"] };
+                user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"] };
                 var id_user = reader["id_user"].ToString();
                 if (!string.IsNullOrEmpty(id_user))
                 {
                     user.Token = new sign_in() { type = short.Parse(id_user.Split('_')[0]), id_user = id_user.Split('_')[1] };
                 }
+
+                reader.Close();
+                reader.Dispose();
+                com.Dispose();
+
+                bool valueReporter = false;
                 if (!user.is_reporter)
                 {
                     if (user.own_ac != "??" && !string.IsNullOrEmpty(user.Nickname) && !string.IsNullOrEmpty(id_user))
                     {
+                        valueReporter = true;
                         // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
                         string DataJson = "[{\"user_id\":\"" + id_user + "\",\"platform\":\"Telegram\",\"event_type\":\"tg new agent\"," +
                             "\"user_properties\":{\"is_agent\":\"yes\"," +
@@ -284,21 +312,17 @@ namespace StaffCommunity
                         var r = AmplitudePOST(DataJson);
                     }
 
-                    NpgsqlCommand com2 = new NpgsqlCommand("update telegram_user set is_reporter=@is_reporter where id=@id");
-                    com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
-                    com.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = true });
+                    NpgsqlCommand com2 = new NpgsqlCommand("update telegram_user set is_reporter=@is_reporter where id=@id", conn);
+                    com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
+                    com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = valueReporter });
                     com2.ExecuteNonQuery();
                     com2.Dispose();
                 }
             }
             else
             {
-                user = new telegram_user() { id = id, own_ac = "??", is_reporter = true, is_requestor = false };
+                user = new telegram_user() { id = id, own_ac = "??", is_reporter = false, is_requestor = false };
             }
-
-            reader.Close();
-            reader.Dispose();
-            com.Dispose();
 
             return user;
         }
@@ -416,13 +440,22 @@ namespace StaffCommunity
             }
         }
 
-        public static void UserBlockChat(long id, AirlineAction action)
+        public static void UserBlockChat(long id, AirlineAction action, telegram_user user)
         {
             NpgsqlCommand com = new NpgsqlCommand("update telegram_user set is_reporter=@is_reporter where id=@id", conn);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = action == AirlineAction.Add });
             com.ExecuteNonQuery();
             com.Dispose();
+
+            if (!user.is_reporter && action == AirlineAction.Add && user.Token != null)
+            {
+                // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
+                string DataJson = "[{\"user_id\":\"" + GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg new agent\"," +
+                    "\"user_properties\":{\"is_agent\":\"yes\"," +
+                    "\"ac\":\"" + user.own_ac + "\", \"nick\":\"" + user.Nickname + "\"}}]";
+                var r = AmplitudePOST(DataJson);
+            }
         }
 
         public static void UpdateAirlinesReporter(string ac, AirlineAction action)
@@ -466,13 +499,31 @@ namespace StaffCommunity
             }
         }
 
-        public static void UpdateUserAC(long id, string ac, string current_ac)
+        public static void UpdateUserAC(long id, string ac, string current_ac, telegram_user user)
         {
-            NpgsqlCommand com = new NpgsqlCommand("update telegram_user set own_ac=@own_ac where id=@id", conn);
+            string id_user = GetUserID(user.Token);
+
+            bool valueReporter = false;
+            if (!string.IsNullOrEmpty(user.Nickname))
+            {
+                valueReporter = true;
+            }
+
+            NpgsqlCommand com = new NpgsqlCommand("update telegram_user set own_ac=@own_ac, is_reporter=@is_reporter where id=@id", conn);
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
             com.Parameters.Add(new NpgsqlParameter() { ParameterName = "own_ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = ac });
+            com.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = valueReporter });
             com.ExecuteNonQuery();
             com.Dispose();
+
+            if (!user.is_reporter)
+            {
+                // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
+                string DataJson = "[{\"user_id\":\"" + id_user + "\",\"platform\":\"Telegram\",\"event_type\":\"tg new agent\"," +
+                    "\"user_properties\":{\"is_agent\":\"yes\"," +
+                    "\"ac\":\"" + user.own_ac + "\", \"nick\":\"" + user.Nickname + "\"}}]";
+                var r = AmplitudePOST(DataJson);
+            }
 
             UpdateAirlinesReporter(current_ac, AirlineAction.Delete);
             UpdateAirlinesReporter(ac, AirlineAction.Add);

@@ -384,14 +384,13 @@ namespace StaffCommunity
 
                             if (user.Token == null)
                             {
-
                                 await botClient.SendTextMessageAsync(message.Chat, "Enter the UID." + Environment.NewLine + "Generate and copy the UID from the Profile section of Staff Airlines app, after logging in:" + Environment.NewLine);
 
                                 UpdateCommandInCache(userid.Value, "entertoken");
                             }
                             else if (string.IsNullOrEmpty(user.Nickname))
                             {
-                                await botClient.SendTextMessageAsync(message.Chat, "Specify your callsign." + Environment.NewLine + "It can be your real name or just a nickname:");
+                                await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname." + Environment.NewLine + "It can be your real name or just a nickname:");
 
                                 UpdateCommandInCache(userid.Value, "enternick");
                             }
@@ -404,7 +403,7 @@ namespace StaffCommunity
                             else
                             {
                                 string nameac = Methods.TestAC(user.own_ac);
-                                await botClient.SendTextMessageAsync(message.Chat, "Agent callsign: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");                                
+                                await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");                                
                             }
 
                             return;
@@ -441,7 +440,7 @@ namespace StaffCommunity
                         }
                         else if (message?.Text?.ToLower() == "/nick")
                         {
-                            await botClient.SendTextMessageAsync(message.Chat, "Specify your callsign." + Environment.NewLine + "It can be your real name or just a nickname:");
+                            await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname." + Environment.NewLine + "It can be your real name or just a nickname:");
 
                             UpdateCommandInCache(userid.Value, "enternick");
 
@@ -519,7 +518,7 @@ namespace StaffCommunity
 
                                     if (string.IsNullOrEmpty(user.Nickname))
                                     {
-                                        await botClient.SendTextMessageAsync(message.Chat, "Specify your callsign." + Environment.NewLine + "It can be your real name or just a nickname:");
+                                        await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname." + Environment.NewLine + "It can be your real name or just a nickname:");
 
                                         UpdateCommandInCache(userid.Value, "enternick");
                                     }
@@ -566,28 +565,31 @@ namespace StaffCommunity
 
                             if (NickAvail)
                             {
-                                var alertnick = Methods.SetNickname(message.Text, Methods.GetUserID(user.Token));
+                                var alertnick = Methods.SetNickname(message.Text, user);
 
                                 if (string.IsNullOrEmpty(alertnick))
                                 {
                                     user.Nickname = message.Text;
                                     UpdateUserInCache(user);
                                     cache.Remove("User" + message.Chat.Id);
-                                    await botClient.SendTextMessageAsync(message.Chat, "Agent callsign: " + user.Nickname + "!");
 
-                                    string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg set ac\"," +
+                                    string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg set agent nick\"," +
                                         "\"user_properties\":{\"nick\":\"" + user.Nickname + "\"}}]";
                                     var r = Methods.AmplitudePOST(DataJson);
 
                                     if (user.own_ac == "??")
                                     {
+                                        await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + "!");
                                         await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code (for example: AA):");
 
                                         UpdateCommandInCache(userid.Value, "preset");
                                     }
                                     else
                                     {
-                                        await botClient.SendTextMessageAsync(message.Chat, "Agent is online. Waiting for requests...");
+                                        //await botClient.SendTextMessageAsync(message.Chat, "Agent is online. Waiting for requests...");
+                                        string nameac = Methods.TestAC(user.own_ac);
+                                        await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
+
                                     }
                                 }
                                 else
@@ -597,7 +599,7 @@ namespace StaffCommunity
                             }
                             else
                             {
-                                await botClient.SendTextMessageAsync(message.Chat, "This callsign is already in use by another agent. Please choose another one:");
+                                await botClient.SendTextMessageAsync(message.Chat, "This nickname is already in use by another agent. Please choose another one:");
                             }
                         }                        
 
@@ -612,7 +614,7 @@ namespace StaffCommunity
                                 try
                                 {
                                     eventLogBot.WriteEntry("UpdateUserAC. " + ac.ToUpper() + "/" + user.own_ac.ToUpper() + "/" + message.Chat.Id);
-                                    Methods.UpdateUserAC(message.Chat.Id, ac.ToUpper(), user.own_ac.ToUpper());
+                                    Methods.UpdateUserAC(message.Chat.Id, ac.ToUpper(), user.own_ac.ToUpper(), user);
                                 }
                                 catch (Exception ex)
                                 {
@@ -1059,7 +1061,10 @@ namespace StaffCommunity
                     var CM = myChatMember.NewChatMember;
                     if (CM.Status == ChatMemberStatus.Kicked) // Заблокировал чат
                     {
-                        Methods.UserBlockChat(userid.Value, AirlineAction.Delete);
+                        Methods.UserBlockChat(userid.Value, AirlineAction.Delete, user);
+
+                        user.is_reporter = false;
+                        UpdateUserInCache(user);
 
                         //пользователь покинул агентский бот
                         string DataJson = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg left agent\"," +
@@ -1074,7 +1079,11 @@ namespace StaffCommunity
                     }
                     else if (CM.Status == ChatMemberStatus.Member) // Разблокировал чат
                     {
-                        Methods.UserBlockChat(userid.Value, AirlineAction.Add);
+                        Methods.UserBlockChat(userid.Value, AirlineAction.Add, user);
+
+                        user.is_reporter = true;
+                        UpdateUserInCache(user);
+
                         if (user.own_ac != "??")
                         {
                             Methods.UpdateAirlinesReporter(user.own_ac, AirlineAction.Add);
