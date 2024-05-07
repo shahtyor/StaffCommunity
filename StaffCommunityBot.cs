@@ -287,8 +287,9 @@ namespace StaffCommunity
                         mestext2 = "Your request has expired";
 
                         //при направлении клиенту сообщения, что запрос протух
+                        string plat = req.Source == 0 ? "telegram" : "app";
                         string DataJson = "[{\"user_id\":\"" + req.Id_requestor + "\",\"platform\":\"Telegram\",\"event_type\":\"tg user request expired message\"," +
-                            "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + "}}]";
+                            "\"event_properties\":{\"platform\":\"" + plat + "\",\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + "}}]";
                         var r = Methods.AmplitudePOST(DataJson);
                     }
                     else
@@ -734,8 +735,9 @@ namespace StaffCommunity
                                     }
 
                                     //при направлении клиенту сообщения с данными по загрузке от агента
+                                    string plat = req.Source == 0 ? "telegram" : "app";
                                     string DataJson = "[{\"user_id\":\"" + req.Id_requestor + "\",\"platform\":\"Telegram\",\"event_type\":\"tg user agent answer message\"," +
-                                        "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"agent\":\"" + Methods.GetUserID(user.Token) + "\",\"nick\":\"" + user.Nickname + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
+                                        "\"event_properties\":{\"platform\":\"" + plat + "\",\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"agent\":\"" + Methods.GetUserID(user.Token) + "\",\"nick\":\"" + user.Nickname + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
                                     var r = Methods.AmplitudePOST(DataJson);
 
                                     var Coll = await Methods.CredToken(Methods.GetUserID(user.Token));
@@ -798,7 +800,13 @@ namespace StaffCommunity
                         }
                         else if (message == "/sub1month")
                         {
-                            if (user.TokenSet.NonSubscribeTokens < Properties.Settings.Default.TokensFor_1_month_sub)
+                            var ProfTok = Methods.GetProfile(Methods.GetUserID(user.Token)).Result;
+
+                            if (ProfTok.Premium)
+                            {
+                                await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "You already have an active subscription!");
+                            }
+                            else if (user.TokenSet.NonSubscribeTokens < Properties.Settings.Default.TokensFor_1_month_sub)
                             {
                                 await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "Not enough tokens to purchase the selected subscription!");
                             }
@@ -819,7 +827,13 @@ namespace StaffCommunity
                         }
                         else if (message == "/sub1week")
                         {
-                            if (user.TokenSet.NonSubscribeTokens < Properties.Settings.Default.TokensFor_1_week_sub)
+                            var ProfTok = Methods.GetProfile(Methods.GetUserID(user.Token)).Result;
+
+                            if (ProfTok.Premium)
+                            {
+                                await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "You already have an active subscription!");
+                            }
+                            else if (user.TokenSet.NonSubscribeTokens < Properties.Settings.Default.TokensFor_1_week_sub)
                             {
                                 await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "Not enough tokens to purchase the selected subscription!");
                             }
@@ -840,7 +854,13 @@ namespace StaffCommunity
                         }
                         else if (message == "/sub3day")
                         {
-                            if (user.TokenSet.NonSubscribeTokens < Properties.Settings.Default.TokensFor_3_day_sub)
+                            var ProfTok = Methods.GetProfile(Methods.GetUserID(user.Token)).Result;
+
+                            if (ProfTok.Premium)
+                            {
+                                await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "You already have an active subscription!");
+                            }
+                            else if (user.TokenSet.NonSubscribeTokens < Properties.Settings.Default.TokensFor_3_day_sub)
                             {
                                 await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "Not enough tokens to purchase the selected subscription!");
                             }
@@ -954,8 +974,10 @@ namespace StaffCommunity
                                         }
 
                                         //при направлении клиенту сообщения, что агент взял запрос в работу
+                                        string plat = request.Source == 0 ? "telegram" : "app";
+
                                         string DataJson = "[{\"user_id\":\"" + request.Id_requestor + "\",\"platform\":\"Telegram\",\"event_type\":\"tg user agent take request message\"," +
-                                            "\"event_properties\":{\"ac\":\"" + request.Operating + "\",\"requestGroupID\":" + request.Id_group + ",\"agent\":\"" + Methods.GetUserID(user.Token) + "\",\"nick\":\"" + user.Nickname + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - request.TS_create).TotalSeconds) + "}}]";
+                                            "\"event_properties\":{\"platform\":\"" + plat + "\",\"ac\":\"" + request.Operating + "\",\"requestGroupID\":" + request.Id_group + ",\"agent\":\"" + Methods.GetUserID(user.Token) + "\",\"nick\":\"" + user.Nickname + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - request.TS_create).TotalSeconds) + "}}]";
                                         var r = Methods.AmplitudePOST(DataJson);
                                     }
                                 }
@@ -999,8 +1021,9 @@ namespace StaffCommunity
                             }
 
                             //при направлении клиенту сообщения, что агент вернул запрос без исполнения
+                            string plat = request.Source == 0 ? "telegram" : "app";
                             string DataJson = "[{\"user_id\":\"" + request.Id_requestor + "\",\"platform\":\"Telegram\",\"event_type\":\"tg user agent return request message\"," +
-                                "\"event_properties\":{\"ac\":\"" + request.Operating + "\",\"requestGroupID\":" + request.Id_group + ",\"agent\":\"" + Methods.GetUserID(user.Token) + "\",\"nick\":\"" + user.Nickname + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - request.TS_create).TotalSeconds) + "}}]";
+                                "\"event_properties\":{\"platform\":\"" + plat + "\",\"ac\":\"" + request.Operating + "\",\"requestGroupID\":" + request.Id_group + ",\"agent\":\"" + Methods.GetUserID(user.Token) + "\",\"nick\":\"" + user.Nickname + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - request.TS_create).TotalSeconds) + "}}]";
                             var r = Methods.AmplitudePOST(DataJson);
                         }
                         else if (message.Substring(0, 6) == "/ready")
