@@ -73,7 +73,7 @@ namespace StaffCommunity
             eventLogBot.Source = "StaffCommunity";
             eventLogBot.Log = "StaffCommunityLog";
 
-            Methods.conn.Open();
+            //Methods.conn.Open();
             Methods.connProc.Open();
         }
 
@@ -362,6 +362,14 @@ namespace StaffCommunity
 
                     try
                     {
+                        var arrmsg = message?.Text?.Split(' ');
+                        var msg = arrmsg[0].ToLower();
+
+                        if (msg == "/start" && message != null && !string.IsNullOrEmpty(message.Text) && arrmsg.Length == 2)
+                        {
+                            cache.Add("start" + userid, message.Text, new CacheItemPolicy() { SlidingExpiration = TimeSpan.Zero, AbsoluteExpiration = DateTimeOffset.Now.AddMinutes(10) });
+                        }
+
                         if (message?.Text?.ToLower() == "\U0001F7e1" || message?.Text?.ToLower() == "U+1F534" || message?.Text?.ToLower() == "/stop")
                         {
                             return;
@@ -373,7 +381,7 @@ namespace StaffCommunity
                             idus = Methods.GetUserID(user.Token);
                         }
 
-                        if (message?.Text?.ToLower() == "/start")
+                        if (msg == "/start")
                         {
                             await botClient.SendTextMessageAsync(message.Chat, ruleText, null, parseMode: ParseMode.Html);
 
@@ -382,6 +390,30 @@ namespace StaffCommunity
                                 "\"user_properties\":{\"is_agent\":\"no\"," +
                                 "\"id_telegram\":\"" + message.Chat.Id + "\"}}]";
                             var r = Methods.AmplitudePOST(DataJson);
+
+                            if (arrmsg.Length == 1)
+                            {
+                                var startexist = cache.Contains("start" + userid);
+                                if (startexist)
+                                {
+                                    var startmsg = (string)cache.Get("start" + userid);
+                                    arrmsg = startmsg.Split(' ');
+                                    cache.Remove("start" + userid);
+                                }
+                            }
+
+                            if (arrmsg.Length == 2)
+                            {
+                                var payload = arrmsg[1].ToLower();
+                                Guid gu;
+                                bool isGuid0 = Guid.TryParse(payload, out gu);
+                                if (isGuid0)
+                                {
+                                    string alert = null;
+                                    user = Methods.ProfileCommand(userid.Value, payload, eventLogBot, out alert);
+                                    UpdateUserInCache(user);
+                                }
+                            }
 
                             if (user.Token == null)
                             {
@@ -1117,6 +1149,7 @@ namespace StaffCommunity
             catch (Exception ex) 
             {
                 eventLogBot.WriteEntry("Exception: " + ex.Message + "..." + ex.StackTrace);
+                return;
             }
         }
 
