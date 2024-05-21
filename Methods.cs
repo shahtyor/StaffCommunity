@@ -72,15 +72,24 @@ namespace StaffCommunity
                             //var PT = new ProfileTokens();
                             string new_ac = PT?.OwnAC ?? "??";
 
+                            RemoveTelegramId(GetUserID(token), id);
+
                             if (reader.Read())
                             {
-                                user = new telegram_user() { id = (long?)reader["id"], first_use = (DateTime)reader["first_use"], own_ac = (new_ac == "??" ? reader["own_ac"].ToString() : new_ac), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"], Token = token, Nickname = reader["nickname"].ToString() };
+                                var sid = reader["id"].ToString();
+                                long? iid = null;
+                                if (!string.IsNullOrEmpty(sid))
+                                {
+                                    iid = long.Parse(sid);
+                                }
+
+                                user = new telegram_user() { id = id, first_use = (DateTime)reader["first_use"], own_ac = (new_ac == "??" ? reader["own_ac"].ToString() : new_ac), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"], Token = token, Nickname = reader["nickname"].ToString() };
 
                                 reader.Close();
                                 reader.Dispose();
                                 com.Dispose();
 
-                                if (!user.is_reporter || user.id == null)
+                                if (!user.is_reporter || iid != id)
                                 {
                                     bool valueReporter = false;
                                     if (new_ac != "??" && !string.IsNullOrEmpty(user.Nickname))
@@ -535,7 +544,7 @@ namespace StaffCommunity
 
         public static void UpdateAirlinesReporter(string ac, AirlineAction action)
         {
-            if (!string.IsNullOrEmpty(ac) && ac.Length == 2)
+            if (!string.IsNullOrEmpty(ac) && ac != "??" && ac.Length == 2)
             {
                 using (NpgsqlConnection connUA = new NpgsqlConnection(Properties.Settings.Default.ConnectionString))
                 {
@@ -919,6 +928,46 @@ namespace StaffCommunity
                 com.Dispose();
                 conn.Close();
                 conn.Dispose();
+            }
+        }
+
+        private static void RemoveTelegramId(string id_user, long id)
+        {
+            using (NpgsqlConnection conn = new NpgsqlConnection(Properties.Settings.Default.ConnectionString))
+            {
+                conn.Open();
+
+                List<string> ListAC = new List<string>();
+                NpgsqlCommand com = new NpgsqlCommand("select own_ac from telegram_user where id=@id and id_user<>@id_user and is_reporter=true", conn);
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = id_user });
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
+                using (NpgsqlDataReader reader = com.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        var ac = reader["own_ac"].ToString();
+                        if (!string.IsNullOrEmpty(ac) && ac != "??")
+                        {
+                            ListAC.Add(ac);
+                        }
+                    }
+                    reader.Close();
+                    reader.Dispose();
+                }
+                com.Dispose();
+
+                com = new NpgsqlCommand("update telegram_user set id=null, is_reporter=false, is_requestor=false where id_user<>@id_user and id=@id", conn);
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = id_user });
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
+                com.ExecuteNonQuery();
+                com.Dispose();
+
+                foreach (string ac in ListAC)
+                {
+                    UpdateAirlinesReporter(ac, AirlineAction.Delete);
+                }
+
+                conn.Close();
             }
         }
 

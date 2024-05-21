@@ -355,7 +355,6 @@ namespace StaffCommunity
                         Properties.Settings.Default.TokensFor_3_day_sub + " tokens for 3 days." + Environment.NewLine + Environment.NewLine +
                         "Main commands:" + Environment.NewLine +
                         "<b>/sub</b> purchase Premium subscription" + Environment.NewLine +
-                        "<b>/profile</b> link your telegram account with your Staff Airlines profile " + Environment.NewLine +
                         "<b>/nick</b> change your nickname" + Environment.NewLine +
                         "<b>/airline</b> change your airline" + Environment.NewLine +
                         "<b>/help</b> description of all commands";
@@ -404,6 +403,8 @@ namespace StaffCommunity
 
                             if (arrmsg.Length == 2)
                             {
+                                cache.Remove("start" + userid);
+
                                 var payload = arrmsg[1].ToLower();
                                 Guid gu;
                                 bool isGuid0 = Guid.TryParse(payload, out gu);
@@ -417,9 +418,9 @@ namespace StaffCommunity
 
                             if (user.Token == null)
                             {
-                                await botClient.SendTextMessageAsync(message.Chat, "Enter the UID." + Environment.NewLine + "Generate and copy the UID from the Profile section of Staff Airlines app, after logging in:" + Environment.NewLine);
+                                await botClient.SendTextMessageAsync(message.Chat, "To link your Staff Airlines profile to your Telegram ID, log into the Staff Airlines app (now only for iOS users, coming soon for Android users) in the “Profile” section and click “For registration as an agent if you are going to post flight load data and earn tokens”" + Environment.NewLine);
 
-                                UpdateCommandInCache(userid.Value, "entertoken");
+                                //UpdateCommandInCache(userid.Value, "entertoken");
                             }
                             else if (string.IsNullOrEmpty(user.Nickname))
                             {
