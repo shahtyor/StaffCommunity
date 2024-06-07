@@ -33,6 +33,7 @@ namespace StaffCommunity
         //TestStaffSearchBot 6906986784:AAGWHhFXFQ3YVyu_c0fdJ1v13Pwsn5nbmBg
         static ObjectCache cache = MemoryCache.Default;
         static CacheItemPolicy policyuser = new CacheItemPolicy() { SlidingExpiration = TimeSpan.Zero, AbsoluteExpiration = DateTimeOffset.Now.AddMonths(6) };
+        static CacheItemPolicy policycode = new CacheItemPolicy() { SlidingExpiration = TimeSpan.Zero, AbsoluteExpiration = DateTimeOffset.Now.AddMinutes(15) };
 
         public enum ServiceState
         {
@@ -434,6 +435,12 @@ namespace StaffCommunity
 
                                 UpdateCommandInCache(userid.Value, "preset");
                             }
+                            else if (Properties.Settings.Default.VerifyEmail && !user.EmailVerified)
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
+
+                                UpdateCommandInCache(userid.Value, "enteremail");
+                            }
                             else
                             {
                                 string nameac = Methods.TestAC(user.own_ac);
@@ -635,7 +642,49 @@ namespace StaffCommunity
                             {
                                 await botClient.SendTextMessageAsync(message.Chat, "This nickname is already in use by another agent. Please choose another one:");
                             }
-                        }                        
+
+                            return;
+                        }           
+                        
+                        if (comm == "enteremail" && user.Token != null && !string.IsNullOrEmpty(message.Text))
+                        {
+                            var email = message.Text.Trim();
+                            if (!Methods.IsPublicEmail(email))
+                            {
+                                var codeverify = Methods.GenCodeForVerify(message.Chat.Id);
+                                PutCodeInCache(userid.Value, codeverify);
+                                Methods.SendEmailWithCode(email, codeverify);
+
+                                UpdateCommandInCache(userid.Value, "entercode");
+                                await botClient.SendTextMessageAsync(message.Chat, "We have sent a verification code by email. Check your mail from Staff Airlines and enter the code sent");
+                            }
+                            else
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat, "Looks like this is not a work email");
+                            }
+
+                            return;
+                        }
+
+                        if (comm == "entercode" && user.Token != null && !string.IsNullOrEmpty(message.Text))
+                        {
+                            var codecache = "";
+                            var keycode = "Code" + userid.Value;
+                            var codeexist = cache.Contains(keycode);
+                            if (codeexist) codecache = (string)cache.Get(keycode);
+
+                            if (message.Text == codecache)
+                            {
+
+                                cache.Remove("User" + message.Chat.Id);
+                            }
+                            else
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat, "The code is invalid or has expired");
+                            }
+
+                            return;
+                        }
 
                         if (comm == "preset")
                         {
@@ -1189,6 +1238,26 @@ namespace StaffCommunity
             try
             {
                 eventLogBot.WriteEntry("UpdateCommandInCache. keycommand=" + keycommand + ", command=" + command);
+            }
+            catch { }
+        }
+
+        private static void PutCodeInCache(long user, string code)
+        {
+            string keycode = "Code" + user;
+
+            var commexist = cache.Contains(keycode);
+            if (commexist)
+            {
+                cache.Set(keycode, code, policycode);
+            }
+            else
+            {
+                cache.Add(keycode, code, policycode);
+            }
+            try
+            {
+                eventLogBot.WriteEntry("PutCodeInCache. keycode=" + keycode + ", command=" + code);
             }
             catch { }
         }

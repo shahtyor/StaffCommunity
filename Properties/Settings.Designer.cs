@@ -155,5 +155,17 @@ namespace StaffCommunity.Properties {
                 this["TokensFor_3_day_sub"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool VerifyEmail {
+            get {
+                return ((bool)(this["VerifyEmail"]));
+            }
+            set {
+                this["VerifyEmail"] = value;
+            }
+        }
     }
 }

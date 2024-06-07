@@ -14,6 +14,7 @@ namespace StaffCommunity
         public ExtendedResult exres { get; set; }
         public sign_in Token { get; set; }
         public string Nickname { get; set; }
+        public bool EmailVerified { get; set; }
         public TokenCollection TokenSet { get; set; }
     }
 

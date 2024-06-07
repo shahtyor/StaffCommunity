@@ -6,12 +6,14 @@ using RestSharp;
 using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Mail;
 using System.Runtime.Caching;
 using System.Text;
 using System.Threading.Channels;
@@ -83,7 +85,7 @@ namespace StaffCommunity
                                     iid = long.Parse(sid);
                                 }
 
-                                user = new telegram_user() { id = id, first_use = (DateTime)reader["first_use"], own_ac = (new_ac == "??" ? reader["own_ac"].ToString() : new_ac), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"], Token = token, Nickname = reader["nickname"].ToString() };
+                                user = new telegram_user() { id = id, first_use = (DateTime)reader["first_use"], own_ac = (new_ac == "??" ? reader["own_ac"].ToString() : new_ac), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"], Token = token, Nickname = reader["nickname"].ToString(), EmailVerified = (bool)reader["email_verified"] };
 
                                 reader.Close();
                                 reader.Dispose();
@@ -287,7 +289,7 @@ namespace StaffCommunity
                         }
 
                         var id_user_arr = id_user.Split('_');
-                        user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), is_reporter = (bool)reader["is_reporter"], Token = new sign_in() { type = short.Parse(id_user_arr[0]), id_user = id_user_arr[1] } };
+                        user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), EmailVerified = (bool)reader["email_verofied"], is_reporter = (bool)reader["is_reporter"], Token = new sign_in() { type = short.Parse(id_user_arr[0]), id_user = id_user_arr[1] } };
 
                         cache.Add(keyus, user, policyuser);
                     }
@@ -322,7 +324,7 @@ namespace StaffCommunity
                     {
                         iid = long.Parse(sid);
                     }
-                    user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"] };
+                    user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), EmailVerified = (bool)reader["email_verified"], is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"] };
                     var id_user = reader["id_user"].ToString();
                     if (!string.IsNullOrEmpty(id_user))
                     {
@@ -436,6 +438,92 @@ namespace StaffCommunity
                 if (cnt > 0) return false;
                 else return true;
             }
+        }
+
+        public static bool IsPublicEmail(string email)
+        {
+            bool result = true;
+            if (IsValidEmail(email))
+            {
+                var amail = email.Split('@');
+                var domain = amail[1];
+
+                using (NpgsqlConnection conn = new NpgsqlConnection(Properties.Settings.Default.ConnectionString))
+                {
+                    conn.Open();
+
+                    NpgsqlCommand com = new NpgsqlCommand("select id from public_domain where domain=@domain", conn);
+                    com.Parameters.Add(new NpgsqlParameter() { ParameterName = "domain", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = domain });
+                    var o = com.ExecuteScalar();
+                    if (o is null)
+                    {
+                        result = false;
+                    }
+                    com.Dispose();
+                    conn.Close();
+                    conn.Dispose();
+                }
+            }
+
+            return result;
+        }
+
+        public static bool IsValidEmail(string source)
+        {
+            return new EmailAddressAttribute().IsValid(source);
+        }
+
+        public static string GenCodeForVerify(long id)
+        {
+            var sid = id.ToString();
+            var seed = int.Parse(sid.Substring(sid.Length - 2));
+            seed = Environment.TickCount + seed;
+            Random rnd = new Random(seed);
+            var irnd = rnd.Next(1000000);
+            return irnd.ToString().PadLeft(6, '0');
+        }
+
+        public static void SendEmailWithCode(string email, string code)
+        {
+            /*try
+            {
+                SmtpClient mySmtpClient = new SmtpClient("my.smtp.exampleserver.net");
+
+                // set smtp-client with basicAuthentication
+                mySmtpClient.UseDefaultCredentials = false;
+                System.Net.NetworkCredential basicAuthenticationInfo = new System.Net.NetworkCredential("username", "password");
+                mySmtpClient.Credentials = basicAuthenticationInfo;
+
+                // add from,to mailaddresses
+                MailAddress from = new MailAddress("test@example.com", "TestFromName");
+                MailAddress to = new MailAddress("test2@example.com", "TestToName");
+                MailMessage myMail = new System.Net.Mail.MailMessage(from, to);
+
+                // add ReplyTo
+                //MailAddress replyTo = new MailAddress("reply@example.com");
+                //myMail.ReplyToList.Add(replyTo);
+
+                // set subject and encoding
+                myMail.Subject = "Test message";
+                myMail.SubjectEncoding = System.Text.Encoding.UTF8;
+
+                // set body-message and encoding
+                myMail.Body = "<b>Test Mail</b><br>using <b>HTML</b>.";
+                myMail.BodyEncoding = System.Text.Encoding.UTF8;
+                // text or html
+                myMail.IsBodyHtml = true;
+
+                mySmtpClient.Send(myMail);
+            }
+            catch (SmtpException ex)
+            {
+                throw new ApplicationException
+                  ("SmtpException has occured: " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }*/
         }
 
         private static List<PermittedAC> GetPermittedAC(string code)
