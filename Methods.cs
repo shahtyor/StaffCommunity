@@ -1,10 +1,13 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.SqlServer.Server;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Npgsql;
+using Npgsql.Internal;
 using RestSharp;
 using System;
 using System.CodeDom.Compiler;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
@@ -15,9 +18,12 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Mail;
 using System.Runtime.Caching;
+using System.Security.Principal;
 using System.Text;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using System.Web.Mail;
+using System.Web.UI.WebControls;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.InlineQueryResults;
@@ -85,7 +91,7 @@ namespace StaffCommunity
                                     iid = long.Parse(sid);
                                 }
 
-                                user = new telegram_user() { id = id, first_use = (DateTime)reader["first_use"], own_ac = (new_ac == "??" ? reader["own_ac"].ToString() : new_ac), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"], Token = token, Nickname = reader["nickname"].ToString(), EmailVerified = (bool)reader["email_verified"] };
+                                user = new telegram_user() { id = id, first_use = (DateTime)reader["first_use"], own_ac = (new_ac == "??" ? reader["own_ac"].ToString() : new_ac), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"], Token = token, Nickname = reader["nickname"].ToString(), Email = reader["email"].ToString() };
 
                                 reader.Close();
                                 reader.Dispose();
@@ -220,7 +226,7 @@ namespace StaffCommunity
             string alert = null;
 
             bool valueReporter = false;
-            if (!string.IsNullOrEmpty(user.own_ac) && user.own_ac != "??")
+            if (!string.IsNullOrEmpty(user.own_ac) && user.own_ac != "??" && !string.IsNullOrEmpty(user.Email))
             {
                 valueReporter = true;
             }
@@ -236,7 +242,59 @@ namespace StaffCommunity
                 com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = id_user });
                 com.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = valueReporter });
 
-                if (!user.is_reporter)
+                if (!user.is_reporter && valueReporter)
+                {
+                    // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
+                    string DataJson = "[{\"user_id\":\"" + id_user + "\",\"platform\":\"Telegram\",\"event_type\":\"tg new agent\"," +
+                        "\"user_properties\":{\"is_agent\":\"yes\"," +
+                        "\"ac\":\"" + user.own_ac + "\", \"nick\":\"" + user.Nickname + "\"}}]";
+                    var r = AmplitudePOST(DataJson);
+                }
+
+                try
+                {
+                    com.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    alert = ex.Message + "..." + ex.StackTrace;
+                }
+
+                com.Dispose();
+                conn.Close();
+                conn.Dispose();
+            }
+
+            return alert;
+        }
+
+        public static string SaveEmail(string email, telegram_user user)
+        {
+            string alert = null;
+
+            bool valueReporter = false;
+            if (!string.IsNullOrEmpty(user.own_ac) && user.own_ac != "??" && !string.IsNullOrEmpty(user.Nickname))
+            {
+                valueReporter = true;
+            }
+
+            string id_user = GetUserID(user.Token);
+
+            using (NpgsqlConnection conn = new NpgsqlConnection(Properties.Settings.Default.ConnectionString))
+            {
+                conn.Open();
+
+                NpgsqlCommand com = new NpgsqlCommand("update telegram_user set email=@email, is_reporter=@is_reporter where id_user=@id_user", conn);
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "email", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = email });
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = id_user });
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = valueReporter });
+
+                // отправляем событие verification success
+                string DataJson0 = "[{\"user_id\":\"" + GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification success\"," +
+                    "\"user_properties\":{\"email\":\"" + email + "\"}}]";
+                var r0 = AmplitudePOST(DataJson0);
+
+                if (!user.is_reporter && valueReporter)
                 {
                     // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
                     string DataJson = "[{\"user_id\":\"" + id_user + "\",\"platform\":\"Telegram\",\"event_type\":\"tg new agent\"," +
@@ -289,7 +347,7 @@ namespace StaffCommunity
                         }
 
                         var id_user_arr = id_user.Split('_');
-                        user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), EmailVerified = (bool)reader["email_verofied"], is_reporter = (bool)reader["is_reporter"], Token = new sign_in() { type = short.Parse(id_user_arr[0]), id_user = id_user_arr[1] } };
+                        user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), Email = reader["email"].ToString(), is_reporter = (bool)reader["is_reporter"], Token = new sign_in() { type = short.Parse(id_user_arr[0]), id_user = id_user_arr[1] } };
 
                         cache.Add(keyus, user, policyuser);
                     }
@@ -324,7 +382,7 @@ namespace StaffCommunity
                     {
                         iid = long.Parse(sid);
                     }
-                    user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), EmailVerified = (bool)reader["email_verified"], is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"] };
+                    user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), Email = reader["email"].ToString(), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"] };
                     var id_user = reader["id_user"].ToString();
                     if (!string.IsNullOrEmpty(id_user))
                     {
@@ -440,9 +498,27 @@ namespace StaffCommunity
             }
         }
 
-        public static bool IsPublicEmail(string email)
+        public static void SetActive()
+        {
+            using (NpgsqlConnection connNA = new NpgsqlConnection(Properties.Settings.Default.ConnectionString))
+            {
+                connNA.Open();
+
+                NpgsqlCommand com = new NpgsqlCommand("update bot_active set ts=NOW() where id=2", connNA);
+                com.ExecuteNonQuery();
+                com.Dispose();
+                connNA.Close();
+                connNA.Dispose();
+            }
+        }
+
+        public static bool IsPublicEmail(string email, telegram_user user)
         {
             bool result = true;
+            if (email == "shahtyor@mail.ru")
+            {
+                return false;
+            }
             if (IsValidEmail(email))
             {
                 var amail = email.Split('@');
@@ -458,6 +534,13 @@ namespace StaffCommunity
                     if (o is null)
                     {
                         result = false;
+                    }
+                    else
+                    {
+                        // отправляем событие public email
+                        string DataJson = "[{\"user_id\":\"" + GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification public email\"," +
+                            "\"user_properties\":{\"email\":\"" + email + "\"}}]";
+                        var r = AmplitudePOST(DataJson);
                     }
                     com.Dispose();
                     conn.Close();
@@ -485,35 +568,39 @@ namespace StaffCommunity
 
         public static void SendEmailWithCode(string email, string code)
         {
-            /*try
+            try
             {
-                SmtpClient mySmtpClient = new SmtpClient("my.smtp.exampleserver.net");
+                SmtpClient mySmtpClient = new SmtpClient("mail.post.bz", 25);
+                mySmtpClient.EnableSsl = true;
 
                 // set smtp-client with basicAuthentication
                 mySmtpClient.UseDefaultCredentials = false;
-                System.Net.NetworkCredential basicAuthenticationInfo = new System.Net.NetworkCredential("username", "password");
+                System.Net.NetworkCredential basicAuthenticationInfo = new System.Net.NetworkCredential("hello@staffairlines.com", "mU5cnaHCZC6U6");
                 mySmtpClient.Credentials = basicAuthenticationInfo;
 
                 // add from,to mailaddresses
-                MailAddress from = new MailAddress("test@example.com", "TestFromName");
-                MailAddress to = new MailAddress("test2@example.com", "TestToName");
-                MailMessage myMail = new System.Net.Mail.MailMessage(from, to);
+                MailAddress from = new MailAddress("noreply@staffairlines.com", "Staff Airlines");
+                MailAddress to = new MailAddress(email);
+                System.Net.Mail.MailMessage myMail = new System.Net.Mail.MailMessage(from, to);
 
-                // add ReplyTo
-                //MailAddress replyTo = new MailAddress("reply@example.com");
-                //myMail.ReplyToList.Add(replyTo);
-
+                string body = "<p style=\"font-family: 'Arial'; font-size: 18px\">" +
+                    "Your Verification Code:<br /><br />" +
+                    "<font size=\"21\">" + code + "</font><br /><br />" +
+                    "This is your verification code for<br />Staff Airlines Flight club account registration.<br />Please make sure to verify within 15 minutes.</p ><br />" +
+                    "<hr /><br />" +
+                    "<span style=\"color:gray; font-family: 'Arial'; font-size: 18px\">This is an automated email.Please do not reply.</span>";
                 // set subject and encoding
-                myMail.Subject = "Test message";
+                myMail.Subject = "Your Verification Code";
                 myMail.SubjectEncoding = System.Text.Encoding.UTF8;
 
                 // set body-message and encoding
-                myMail.Body = "<b>Test Mail</b><br>using <b>HTML</b>.";
+                myMail.Body = body;
                 myMail.BodyEncoding = System.Text.Encoding.UTF8;
                 // text or html
                 myMail.IsBodyHtml = true;
 
                 mySmtpClient.Send(myMail);
+
             }
             catch (SmtpException ex)
             {
@@ -523,8 +610,66 @@ namespace StaffCommunity
             catch (Exception ex)
             {
                 throw ex;
-            }*/
+            }
         }
+
+       /* public static void SendEmailWithCode2(string email, string code)
+        {
+            try
+            {
+                System.Web.Mail.MailMessage myMail = new System.Web.Mail.MailMessage();
+                myMail.Fields.Add
+                    ("http://schemas.microsoft.com/cdo/configuration/smtpserver",
+                                  "mail.post.bz");
+                myMail.Fields.Add
+                    ("http://schemas.microsoft.com/cdo/configuration/smtpserverport",
+                                  "465");
+                myMail.Fields.Add
+                    ("http://schemas.microsoft.com/cdo/configuration/sendusing",
+                                  "2");
+                //sendusing: cdoSendUsingPort, value 2, for sending the message using 
+                //the network.
+
+                //smtpauthenticate: Specifies the mechanism used when authenticating 
+                //to an SMTP 
+                //service over the network. Possible values are:
+                //- cdoAnonymous, value 0. Do not authenticate.
+                //- cdoBasic, value 1. Use basic clear-text authentication. 
+                //When using this option you have to provide the user name and password 
+                //through the sendusername and sendpassword fields.
+                //- cdoNTLM, value 2. The current process security context is used to 
+                // authenticate with the service.
+                myMail.Fields.Add
+                ("http://schemas.microsoft.com/cdo/configuration/smtpauthenticate", "1");
+                //Use 0 for anonymous
+                myMail.Fields.Add
+                ("http://schemas.microsoft.com/cdo/configuration/sendusername",
+                    "hello@staffairlines.com");
+                myMail.Fields.Add
+                ("http://schemas.microsoft.com/cdo/configuration/sendpassword",
+                     "mU5cnaHCZC6U6");
+                myMail.Fields.Add
+                ("http://schemas.microsoft.com/cdo/configuration/smtpusessl",
+                     "true");
+                myMail.From = "hello@staffairlines.com";
+                myMail.To = "shahtyor@mail.ru";
+                myMail.Subject = "test mail";
+                myMail.BodyFormat = MailFormat.Html;
+                myMail.Body = "<b>Test Mail</b><br>using <b>HTML</b>.";
+
+                System.Web.Mail.SmtpMail.SmtpServer = "mail.post.bz:465";
+                System.Web.Mail.SmtpMail.Send(myMail);
+            }
+            catch (SmtpException ex)
+            {
+                throw new ApplicationException
+                  ("SmtpException has occured: " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }*/
 
         private static List<PermittedAC> GetPermittedAC(string code)
         {

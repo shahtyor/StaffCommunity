@@ -144,6 +144,7 @@ namespace StaffCommunity
         public static async Task Processing()
         {
             eventLogBot.WriteEntry("Processing: " + DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss"));
+            Methods.SetActive();
 
             //Message msg = await bot.SendTextMessageAsync(new ChatId(5231676978), "test");
 
@@ -381,137 +382,155 @@ namespace StaffCommunity
                             idus = Methods.GetUserID(user.Token);
                         }
 
-                        if (msg == "/start")
+                        string comm = "";
+                        var commexist = cache.Contains("User" + userid.Value);
+                        if (commexist) comm = (string)cache.Get("User" + userid.Value);
+
+                        if (string.IsNullOrEmpty(comm))
                         {
-                            await botClient.SendTextMessageAsync(message.Chat, ruleText, null, parseMode: ParseMode.Html);
-
-                            // отправляем событие «первое появление  пользователя в поисковом боте (/start)» в амплитуд
-                            string DataJson = "[{\"user_id\":\"" + message.Chat.Id + "\",\"platform\":\"Telegram\",\"event_type\":\"tg ab join\"," +
-                                "\"user_properties\":{\"is_agent\":\"no\"," +
-                                "\"id_telegram\":\"" + message.Chat.Id + "\"}}]";
-                            var r = Methods.AmplitudePOST(DataJson);
-
-                            if (arrmsg.Length == 1)
+                            if (msg == "/start")
                             {
-                                var startexist = cache.Contains("start" + userid);
-                                if (startexist)
+                                await botClient.SendTextMessageAsync(message.Chat, ruleText, null, parseMode: ParseMode.Html);
+
+                                // отправляем событие «первое появление  пользователя в поисковом боте (/start)» в амплитуд
+                                string DataJson = "[{\"user_id\":\"" + message.Chat.Id + "\",\"platform\":\"Telegram\",\"event_type\":\"tg ab join\"," +
+                                    "\"user_properties\":{\"is_agent\":\"no\"," +
+                                    "\"id_telegram\":\"" + message.Chat.Id + "\"}}]";
+                                var r = Methods.AmplitudePOST(DataJson);
+
+                                if (arrmsg.Length == 1)
                                 {
-                                    var startmsg = (string)cache.Get("start" + userid);
-                                    arrmsg = startmsg.Split(' ');
+                                    var startexist = cache.Contains("start" + userid);
+                                    if (startexist)
+                                    {
+                                        var startmsg = (string)cache.Get("start" + userid);
+                                        arrmsg = startmsg.Split(' ');
+                                        cache.Remove("start" + userid);
+                                    }
+                                }
+
+                                if (arrmsg.Length == 2)
+                                {
                                     cache.Remove("start" + userid);
+
+                                    var payload = arrmsg[1].ToLower();
+                                    Guid gu;
+                                    bool isGuid0 = Guid.TryParse(payload, out gu);
+                                    if (isGuid0)
+                                    {
+                                        string alert = null;
+                                        user = Methods.ProfileCommand(userid.Value, payload, eventLogBot, out alert);
+                                        UpdateUserInCache(user);
+                                    }
                                 }
-                            }
 
-                            if (arrmsg.Length == 2)
-                            {
-                                cache.Remove("start" + userid);
-
-                                var payload = arrmsg[1].ToLower();
-                                Guid gu;
-                                bool isGuid0 = Guid.TryParse(payload, out gu);
-                                if (isGuid0)
+                                if (user.Token == null)
                                 {
-                                    string alert = null;
-                                    user = Methods.ProfileCommand(userid.Value, payload, eventLogBot, out alert);
-                                    UpdateUserInCache(user);
-                                }
-                            }
+                                    await botClient.SendTextMessageAsync(message.Chat, "To link your Staff Airlines profile to your Telegram ID, log into the Staff Airlines app (now only for iOS users, coming soon for Android users) in the “Profile” section and click “For registration as an agent if you are going to post flight load data and earn tokens”" + Environment.NewLine);
 
-                            if (user.Token == null)
+                                    //UpdateCommandInCache(userid.Value, "entertoken");
+                                }
+                                else if (string.IsNullOrEmpty(user.Nickname))
+                                {
+                                    await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname." + Environment.NewLine + "It can be your real name or just a nickname:");
+
+                                    UpdateCommandInCache(userid.Value, "enternick");
+                                }
+                                else if (user.own_ac == "??")
+                                {
+                                    await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code (for example: AA):");
+
+                                    UpdateCommandInCache(userid.Value, "preset");
+                                }
+                                else if (Properties.Settings.Default.VerifyEmail && string.IsNullOrEmpty(user.Email))
+                                {
+                                    await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
+
+                                    // отправляем событие error code
+                                    string DataJson00 = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification start\"}]";                                        
+                                    var r00 = Methods.AmplitudePOST(DataJson00);
+
+                                    UpdateCommandInCache(userid.Value, "enteremail");
+                                }
+                                else
+                                {
+                                    string nameac = Methods.TestAC(user.own_ac);
+                                    await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
+                                }
+
+                                return;
+                            }
+                            else if (user.Token == null)
                             {
                                 await botClient.SendTextMessageAsync(message.Chat, "To link your Staff Airlines profile to your Telegram ID, log into the Staff Airlines app (now only for iOS users, coming soon for Android users) in the “Profile” section and click “For registration as an agent if you are going to post flight load data and earn tokens”" + Environment.NewLine);
 
-                                //UpdateCommandInCache(userid.Value, "entertoken");
+                                return;
                             }
-                            else if (string.IsNullOrEmpty(user.Nickname))
+                            else if (message?.Text?.ToLower() == "/help")
+                            {
+                                //Methods.SendEmailWithCode("1", "2");
+
+                                await botClient.SendTextMessageAsync(message.Chat, ruleText, parseMode: ParseMode.Html);
+                                return;
+                            }
+                            else if (message?.Text?.ToLower() == "/profile")
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat, "Enter the UID." + Environment.NewLine + "Generate and copy the UID from the Profile section of Staff Airlines app, after logging in:" + Environment.NewLine);
+
+                                // отправляем событие «запрос uid для линковки профиля (/profile)» в амплитуд
+                                string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg start link profile\"," +
+                                    "\"event_properties\":{\"bot\":\"ab\"}}]";
+                                var r = Methods.AmplitudePOST(DataJson);
+
+                                UpdateCommandInCache(userid.Value, "entertoken");
+
+                                return;
+                            }
+                            else if (message?.Text?.ToLower() == "/airline")
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat, "Specify your airline. Enter your airline's code (for example: AA):");
+
+                                string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg start set ac\"," +
+                                    "\"event_properties\":{\"bot\":\"ab\"}}]";
+                                var r = Methods.AmplitudePOST(DataJson);
+
+                                UpdateCommandInCache(userid.Value, "preset");
+
+                                return;
+                            }
+                            else if (message?.Text?.ToLower() == "/nick")
                             {
                                 await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname." + Environment.NewLine + "It can be your real name or just a nickname:");
 
                                 UpdateCommandInCache(userid.Value, "enternick");
+
+                                return;
                             }
-                            else if (user.own_ac == "??")
+                            else if (message?.Text?.ToLower() == "/sub")
                             {
-                                await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code (for example: AA):");
-
-                                UpdateCommandInCache(userid.Value, "preset");
-                            }
-                            else if (Properties.Settings.Default.VerifyEmail && !user.EmailVerified)
-                            {
-                                await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
-
-                                UpdateCommandInCache(userid.Value, "enteremail");
-                            }
-                            else
-                            {
-                                string nameac = Methods.TestAC(user.own_ac);
-                                await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");                                
-                            }
-
-                            return;
-                        }
-                        else if (message?.Text?.ToLower() == "/help")
-                        {
-                            await botClient.SendTextMessageAsync(message.Chat, ruleText, parseMode: ParseMode.Html);
-                            return;
-                        }
-                        else if (message?.Text?.ToLower() == "/profile")
-                        {
-                            await botClient.SendTextMessageAsync(message.Chat, "Enter the UID." + Environment.NewLine + "Generate and copy the UID from the Profile section of Staff Airlines app, after logging in:" + Environment.NewLine);
-
-                            // отправляем событие «запрос uid для линковки профиля (/profile)» в амплитуд
-                            string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg start link profile\"," +
-                                "\"event_properties\":{\"bot\":\"ab\"}}]";
-                            var r = Methods.AmplitudePOST(DataJson);
-
-                            UpdateCommandInCache(userid.Value, "entertoken");
-
-                            return;
-                        }
-                        else if (message?.Text?.ToLower() == "/airline")
-                        {
-                            await botClient.SendTextMessageAsync(message.Chat, "Specify your airline. Enter your airline's code (for example: AA):");
-
-                            string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg start set ac\"," +
-                                "\"event_properties\":{\"bot\":\"ab\"}}]";
-                            var r = Methods.AmplitudePOST(DataJson);
-
-                            UpdateCommandInCache(userid.Value, "preset");
-
-                            return;
-                        }
-                        else if (message?.Text?.ToLower() == "/nick")
-                        {
-                            await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname." + Environment.NewLine + "It can be your real name or just a nickname:");
-
-                            UpdateCommandInCache(userid.Value, "enternick");
-
-                            return;
-                        }
-                        else if (message?.Text?.ToLower() == "/sub")
-                        {
-                            if (user == null || user.Token == null)
-                            {
-                                await botClient.SendTextMessageAsync(message.Chat, "To purchase the subscription, you have to log in (/profile)");
-                            }
-                            else
-                            {
-                                var ProfTok = Methods.GetProfile(Methods.GetUserID(user.Token)).Result;
-
-                                string DataJson = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"void\"," +
-                                    "\"user_properties\":{\"paidStatus\":\"" + (ProfTok.Premium ? "premiumAccess" : "free plan") + "\"}}]";
-                                var r = Methods.AmplitudePOST(DataJson);
-
-                                if (ProfTok.Premium)
+                                if (user == null || user.Token == null)
                                 {
-                                    await botClient.SendTextMessageAsync(message.Chat, "You already have an active subscription!");
+                                    await botClient.SendTextMessageAsync(message.Chat, "To purchase the subscription, you have to log in (/profile)");
                                 }
                                 else
                                 {
-                                    user.TokenSet = new TokenCollection() { SubscribeTokens = ProfTok.SubscribeTokens, NonSubscribeTokens = ProfTok.NonSubscribeTokens };
-                                    UpdateUserInCache(user);
+                                    var ProfTok = Methods.GetProfile(Methods.GetUserID(user.Token)).Result;
 
-                                    var replyKeyboardMarkup = new InlineKeyboardMarkup(new[]
+                                    string DataJson = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"void\"," +
+                                        "\"user_properties\":{\"paidStatus\":\"" + (ProfTok.Premium ? "premiumAccess" : "free plan") + "\"}}]";
+                                    var r = Methods.AmplitudePOST(DataJson);
+
+                                    if (ProfTok.Premium)
                                     {
+                                        await botClient.SendTextMessageAsync(message.Chat, "You already have an active subscription!");
+                                    }
+                                    else
+                                    {
+                                        user.TokenSet = new TokenCollection() { SubscribeTokens = ProfTok.SubscribeTokens, NonSubscribeTokens = ProfTok.NonSubscribeTokens };
+                                        UpdateUserInCache(user);
+
+                                        var replyKeyboardMarkup = new InlineKeyboardMarkup(new[]
+                                        {
                                         new[]
                                         {
                                             InlineKeyboardButton.WithCallbackData("1 month", "/sub1month"),
@@ -520,61 +539,73 @@ namespace StaffCommunity
                                         },
                                     });
 
-                                    await botClient.SendTextMessageAsync(message.Chat, "Select the premium subscription option:" + Environment.NewLine + 
-                                        "   - 1 month for " + Properties.Settings.Default.TokensFor_1_month_sub + " tokens" + Environment.NewLine +
-                                        "   - 1 week for " + Properties.Settings.Default.TokensFor_1_week_sub + " tokens" + Environment.NewLine + 
-                                        "   - 3 days for " + Properties.Settings.Default.TokensFor_3_day_sub + " tokens", null, null, replyMarkup: replyKeyboardMarkup);
+                                        await botClient.SendTextMessageAsync(message.Chat, "Select the premium subscription option:" + Environment.NewLine +
+                                            "   - 1 month for " + Properties.Settings.Default.TokensFor_1_month_sub + " tokens" + Environment.NewLine +
+                                            "   - 1 week for " + Properties.Settings.Default.TokensFor_1_week_sub + " tokens" + Environment.NewLine +
+                                            "   - 3 days for " + Properties.Settings.Default.TokensFor_3_day_sub + " tokens", null, null, replyMarkup: replyKeyboardMarkup);
+                                    }
                                 }
                             }
                         }
-
-
-                        string comm = "";
-                        var commexist = cache.Contains("User" + userid.Value);
-                        if (commexist) comm = (string)cache.Get("User" + userid.Value);
-
-                        eventLogBot.WriteEntry("comm: " + comm);
-
-                        if (comm == "entertoken" && !string.IsNullOrEmpty(message.Text))
+                        else
                         {
-                            Guid gu;
-                            bool isGuid0 = Guid.TryParse(message.Text, out gu);
+                            eventLogBot.WriteEntry("comm: " + comm);
 
-                            if (isGuid0)
+                            var messageText = message.Text.Replace("/", "");
+
+                            if (comm == "entertoken" && !string.IsNullOrEmpty(messageText))
                             {
-                                string alert = null;
-                                user = Methods.ProfileCommand(userid.Value, message.Text, eventLogBot, out alert);
+                                Guid gu;
+                                bool isGuid0 = Guid.TryParse(messageText, out gu);
 
-                                if (string.IsNullOrEmpty(alert))
+                                if (isGuid0)
                                 {
-                                    UpdateUserInCache(user);
+                                    string alert = null;
+                                    user = Methods.ProfileCommand(userid.Value, messageText, eventLogBot, out alert);
 
-                                    if (!string.IsNullOrEmpty(user.own_ac))
+                                    if (string.IsNullOrEmpty(alert))
                                     {
-                                        string nameac = Methods.TestAC(user.own_ac);
-                                        await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + user.own_ac + ")");
+                                        UpdateUserInCache(user);
+
+                                        if (!string.IsNullOrEmpty(user.own_ac))
+                                        {
+                                            string nameac = Methods.TestAC(user.own_ac);
+                                            await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + user.own_ac + ")");
+                                        }
+
+                                        cache.Remove("User" + message.Chat.Id);
+
+                                        if (string.IsNullOrEmpty(user.Nickname))
+                                        {
+                                            await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname." + Environment.NewLine + "It can be your real name or just a nickname:");
+
+                                            UpdateCommandInCache(userid.Value, "enternick");
+                                        }
+                                        else if (user.own_ac == "??")
+                                        {
+                                            //await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline:", replyMarkup: GetIkmSetAir(user.own_ac));
+                                            await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code (for example: AA):");
+
+                                            UpdateCommandInCache(userid.Value, "preset");
+                                        }
                                     }
-
-                                    cache.Remove("User" + message.Chat.Id);
-
-                                    if (string.IsNullOrEmpty(user.Nickname))
+                                    else
                                     {
-                                        await botClient.SendTextMessageAsync(message.Chat, "Specify your nickname." + Environment.NewLine + "It can be your real name or just a nickname:");
-
-                                        UpdateCommandInCache(userid.Value, "enternick");
-                                    }
-                                    else if (user.own_ac == "??")
-                                    {
-                                        //await botClient.SendTextMessageAsync(message.Chat, "Own ac: " + user.own_ac + Environment.NewLine + "Specify your airline:", replyMarkup: GetIkmSetAir(user.own_ac));
-                                        await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code (for example: AA):");
-
-                                        UpdateCommandInCache(userid.Value, "preset");
+                                        await botClient.SendTextMessageAsync(message.Chat, alert);
+                                        if (user is null || user.id == 0 || user.Token is null)
+                                        {
+                                            await botClient.SendTextMessageAsync(message.Chat, "Enter the UID (generate it in the Staff Airlines app in the Profile section, after logging in):");
+                                        }
+                                        else
+                                        {
+                                            cache.Remove("User" + message.Chat.Id);
+                                        }
                                     }
                                 }
                                 else
                                 {
-                                    await botClient.SendTextMessageAsync(message.Chat, alert);
-                                    if (user is null || user.id == 0 || user.Token is null)
+                                    await botClient.SendTextMessageAsync(message.Chat, "The UID must contain 32 digits/letters and 4 hyphens!");
+                                    if (user is null || user.Token is null)
                                     {
                                         await botClient.SendTextMessageAsync(message.Chat, "Enter the UID (generate it in the Staff Airlines app in the Profile section, after logging in):");
                                     }
@@ -583,152 +614,168 @@ namespace StaffCommunity
                                         cache.Remove("User" + message.Chat.Id);
                                     }
                                 }
-                            }
-                            else
-                            {
-                                await botClient.SendTextMessageAsync(message.Chat, "The UID must contain 32 digits/letters and 4 hyphens!");
-                                if (user is null || user.Token is null)
-                                {
-                                    await botClient.SendTextMessageAsync(message.Chat, "Enter the UID (generate it in the Staff Airlines app in the Profile section, after logging in):");
-                                }
-                                else
-                                {
-                                    cache.Remove("User" + message.Chat.Id);
-                                }
+
+                                return;
                             }
 
-                            return;
-                        }
-
-                        if (comm == "enternick" && user.Token != null && !string.IsNullOrEmpty(message.Text))
-                        {
-                            var NickAvail = Methods.NickAvailable(message.Text, Methods.GetUserID(user.Token));
-
-                            if (NickAvail)
+                            if (comm == "enternick" && user.Token != null && !string.IsNullOrEmpty(messageText))
                             {
-                                var alertnick = Methods.SetNickname(message.Text, user);
+                                var NickAvail = Methods.NickAvailable(messageText, Methods.GetUserID(user.Token));
 
-                                if (string.IsNullOrEmpty(alertnick))
+                                if (NickAvail)
                                 {
-                                    user.Nickname = message.Text;
-                                    UpdateUserInCache(user);
-                                    cache.Remove("User" + message.Chat.Id);
+                                    var alertnick = Methods.SetNickname(messageText, user);
 
-                                    string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg set agent nick\"," +
-                                        "\"user_properties\":{\"nick\":\"" + user.Nickname + "\"}}]";
-                                    var r = Methods.AmplitudePOST(DataJson);
-
-                                    if (user.own_ac == "??")
+                                    if (string.IsNullOrEmpty(alertnick))
                                     {
-                                        await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + "!");
-                                        await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code (for example: AA):");
+                                        user.Nickname = messageText;
+                                        UpdateUserInCache(user);
+                                        cache.Remove("User" + message.Chat.Id);
 
-                                        UpdateCommandInCache(userid.Value, "preset");
+                                        string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg set agent nick\"," +
+                                            "\"user_properties\":{\"nick\":\"" + user.Nickname + "\"}}]";
+                                        var r = Methods.AmplitudePOST(DataJson);
+
+                                        if (user.own_ac == "??")
+                                        {
+                                            await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + "!");
+                                            await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code (for example: AA):");
+
+                                            UpdateCommandInCache(userid.Value, "preset");
+                                        }
+                                        else if (string.IsNullOrEmpty(user.Email))
+                                        {
+                                            await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + "!");
+                                            await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
+                                            UpdateCommandInCache(userid.Value, "enteremail");
+                                        }
+                                        else
+                                        {
+                                            //await botClient.SendTextMessageAsync(message.Chat, "Agent is online. Waiting for requests...");
+                                            string nameac = Methods.TestAC(user.own_ac);
+                                            await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
+
+                                        }
                                     }
                                     else
                                     {
-                                        //await botClient.SendTextMessageAsync(message.Chat, "Agent is online. Waiting for requests...");
-                                        string nameac = Methods.TestAC(user.own_ac);
-                                        await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
-
+                                        await botClient.SendTextMessageAsync(message.Chat, alertnick);
                                     }
                                 }
                                 else
                                 {
-                                    await botClient.SendTextMessageAsync(message.Chat, alertnick);
+                                    await botClient.SendTextMessageAsync(message.Chat, "This nickname is already in use by another agent. Please choose another one:");
                                 }
-                            }
-                            else
-                            {
-                                await botClient.SendTextMessageAsync(message.Chat, "This nickname is already in use by another agent. Please choose another one:");
+
+                                return;
                             }
 
-                            return;
-                        }           
-                        
-                        if (comm == "enteremail" && user.Token != null && !string.IsNullOrEmpty(message.Text))
-                        {
-                            var email = message.Text.Trim();
-                            if (!Methods.IsPublicEmail(email))
+                            if (comm == "enteremail" && user.Token != null && !string.IsNullOrEmpty(messageText))
                             {
-                                var codeverify = Methods.GenCodeForVerify(message.Chat.Id);
-                                PutCodeInCache(userid.Value, codeverify);
-                                Methods.SendEmailWithCode(email, codeverify);
-
-                                UpdateCommandInCache(userid.Value, "entercode");
-                                await botClient.SendTextMessageAsync(message.Chat, "We have sent a verification code by email. Check your mail from Staff Airlines and enter the code sent");
-                            }
-                            else
-                            {
-                                await botClient.SendTextMessageAsync(message.Chat, "Looks like this is not a work email");
-                            }
-
-                            return;
-                        }
-
-                        if (comm == "entercode" && user.Token != null && !string.IsNullOrEmpty(message.Text))
-                        {
-                            var codecache = "";
-                            var keycode = "Code" + userid.Value;
-                            var codeexist = cache.Contains(keycode);
-                            if (codeexist) codecache = (string)cache.Get(keycode);
-
-                            if (message.Text == codecache)
-                            {
-
-                                cache.Remove("User" + message.Chat.Id);
-                            }
-                            else
-                            {
-                                await botClient.SendTextMessageAsync(message.Chat, "The code is invalid or has expired");
-                            }
-
-                            return;
-                        }
-
-                        if (comm == "preset")
-                        {
-                            //eventLogBot.WriteEntry("command preset");
-
-                            var ac = message.Text;
-                            var nameac = Methods.TestAC(ac.ToUpper());
-                            if (!string.IsNullOrEmpty(nameac))
-                            {
-                                try
+                                var email = messageText.Trim();
+                                if (!Methods.IsPublicEmail(email, user))
                                 {
-                                    eventLogBot.WriteEntry("UpdateUserAC. " + ac.ToUpper() + "/" + user.own_ac.ToUpper() + "/" + message.Chat.Id);
-                                    Methods.UpdateUserAC(message.Chat.Id, ac.ToUpper(), user.own_ac.ToUpper(), user);
+                                    var codeverify = Methods.GenCodeForVerify(message.Chat.Id);
+                                    PutCodeInCache(userid.Value, codeverify);
+                                    PutEmailInCache(userid.Value, email);
+                                    Methods.SendEmailWithCode(email, codeverify);
+
+                                    UpdateCommandInCache(userid.Value, "entercode");
+                                    await botClient.SendTextMessageAsync(message.Chat, "We have sent a verification code by email. Check your mail from Staff Airlines and enter the code sent");
                                 }
-                                catch (Exception ex)
+                                else
                                 {
-                                    eventLogBot.WriteEntry("UpdateUserAC. " + ac.ToUpper() + "/" + user.own_ac.ToUpper() + ". " + ex.Message + "..." + ex.StackTrace);
+                                    await botClient.SendTextMessageAsync(message.Chat, "Looks like this is not a work email");
                                 }
-                                //var permitted = GetPermittedAC(ac.ToUpper());
-                                //var sperm = string.Join('-', permitted.Select(p => p.Permit));
-                                user.own_ac = ac;
-                                //user.permitted_ac = sperm;
-                                UpdateUserInCache(user);
 
-                                cache.Remove("User" + message.Chat.Id);
-
-                                string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg set ac\"," +
-                                    "\"user_properties\":{\"ac\":\"" + ac.ToUpper() + "\"}," +
-                                    "\"event_properties\":{\"bot\":\"ab\"}}]";
-                                var r = Methods.AmplitudePOST(DataJson);
-
-                                await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + ac.ToUpper() + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
+                                return;
                             }
-                            else
+
+                            if (comm == "entercode" && user.Token != null && !string.IsNullOrEmpty(messageText))
                             {
-                                await botClient.SendTextMessageAsync(message.Chat, "Airline code " + ac.ToUpper() + " not found! Enter your airline's code:");
+                                var codecache = "";
+                                var email33 = "";
+                                var keycode = "Code" + userid.Value;
+                                var emailcode = "Email" + userid.Value;
+                                var codeexist = cache.Contains(keycode);
+                                if (codeexist) codecache = (string)cache.Get(keycode);
+                                var emailexist = cache.Contains(emailcode);
+                                if (emailexist) email33 = (string)cache.Get(emailcode);
+
+                                eventLogBot.WriteEntry("entercode. keycode=" + keycode + ", code=" + codecache + ", message=" + messageText);
+
+                                if (messageText == codecache)
+                                {
+                                    Methods.SaveEmail(email33, user);
+
+                                    user.Email = email33;
+                                    UpdateUserInCache(user);
+
+                                    cache.Remove("User" + message.Chat.Id);
+                                    cache.Remove("Code" + message.Chat.Id);
+                                    cache.Remove("Email" + message.Chat.Id);
+
+                                    string nameac = Methods.TestAC(user.own_ac);
+                                    await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
+                                }
+                                else
+                                {
+                                    // отправляем событие error code
+                                    string DataJson = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification error code\"," +
+                                        "\"user_properties\":{\"email\":\"" + email33 + "\"}," +
+                                        "\"event_properties\":{\"cache\":\"" + codecache + "\",\"code\":\"" + messageText + "\"}}]";
+                                    var r = Methods.AmplitudePOST(DataJson);
+
+                                    await botClient.SendTextMessageAsync(message.Chat, "The code is invalid or has expired");
+                                    await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
+
+                                    UpdateCommandInCache(userid.Value, "enteremail");
+                                }
+
+                                return;
                             }
-                            return;
-                        }
 
-                        //eventLogBot.WriteEntry("command=" + comm + ", chat=" + message.Chat.Id);
+                            if (comm == "preset")
+                            {
+                                //eventLogBot.WriteEntry("command preset");
 
-                        if (!string.IsNullOrEmpty(comm))
-                        {
+                                var ac = messageText;
+                                var nameac = Methods.TestAC(ac.ToUpper());
+                                if (!string.IsNullOrEmpty(nameac))
+                                {
+                                    try
+                                    {
+                                        eventLogBot.WriteEntry("UpdateUserAC. " + ac.ToUpper() + "/" + user.own_ac.ToUpper() + "/" + message.Chat.Id);
+                                        Methods.UpdateUserAC(message.Chat.Id, ac.ToUpper(), user.own_ac.ToUpper(), user);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        eventLogBot.WriteEntry("UpdateUserAC. " + ac.ToUpper() + "/" + user.own_ac.ToUpper() + ". " + ex.Message + "..." + ex.StackTrace);
+                                    }
+                                    //var permitted = GetPermittedAC(ac.ToUpper());
+                                    //var sperm = string.Join('-', permitted.Select(p => p.Permit));
+                                    user.own_ac = ac;
+                                    //user.permitted_ac = sperm;
+                                    UpdateUserInCache(user);
+
+                                    cache.Remove("User" + message.Chat.Id);
+
+                                    string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg set ac\"," +
+                                        "\"user_properties\":{\"ac\":\"" + ac.ToUpper() + "\"}," +
+                                        "\"event_properties\":{\"bot\":\"ab\"}}]";
+                                    var r = Methods.AmplitudePOST(DataJson);
+
+                                    await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + ac.ToUpper() + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
+                                }
+                                else
+                                {
+                                    await botClient.SendTextMessageAsync(message.Chat, "Airline code " + ac.ToUpper() + " not found! Enter your airline's code:");
+                                }
+                                return;
+                            }
+
+                            //eventLogBot.WriteEntry("command=" + comm + ", chat=" + message.Chat.Id);
+
                             if (comm.Substring(0, 6) == "ready1")
                             {
                                 var commwithpar = comm.Split('/');
@@ -736,14 +783,14 @@ namespace StaffCommunity
                                 eventLogBot.WriteEntry("command ready1. id: " + commwithpar[1]);
 
                                 short n;
-                                bool isNumeric = short.TryParse(message?.Text, out n);
+                                bool isNumeric = short.TryParse(messageText, out n);
                                 if (isNumeric)
                                 {
                                     try
                                     {
                                         Methods.SetCount(long.Parse(commwithpar[1]), PlaceType.Economy, n);
                                     }
-                                    catch (Exception ex) 
+                                    catch (Exception ex)
                                     {
                                         eventLogBot.WriteEntry("SetCount: " + ex.Message + "..." + ex.StackTrace);
                                     }
@@ -764,7 +811,7 @@ namespace StaffCommunity
 
                                 var commwithpar = comm.Split('/');
                                 short n;
-                                bool isNumeric = short.TryParse(message?.Text, out n);
+                                bool isNumeric = short.TryParse(messageText, out n);
                                 if (isNumeric)
                                 {
                                     Methods.SetCount(long.Parse(commwithpar[1]), PlaceType.Business, n);
@@ -786,7 +833,7 @@ namespace StaffCommunity
 
                                 var commwithpar = comm.Split('/');
                                 short n;
-                                bool isNumeric = short.TryParse(message?.Text, out n);
+                                bool isNumeric = short.TryParse(messageText, out n);
                                 if (isNumeric)
                                 {
                                     var id_req = long.Parse(commwithpar[1]);
@@ -1249,15 +1296,35 @@ namespace StaffCommunity
             var commexist = cache.Contains(keycode);
             if (commexist)
             {
-                cache.Set(keycode, code, policycode);
+                cache.Set(keycode, code, policyuser);
             }
             else
             {
-                cache.Add(keycode, code, policycode);
+                cache.Add(keycode, code, policyuser);
             }
             try
             {
                 eventLogBot.WriteEntry("PutCodeInCache. keycode=" + keycode + ", command=" + code);
+            }
+            catch { }
+        }
+
+        private static void PutEmailInCache(long user, string email)
+        {
+            string keycode = "Email" + user;
+
+            var commexist = cache.Contains(keycode);
+            if (commexist)
+            {
+                cache.Set(keycode, email, policyuser);
+            }
+            else
+            {
+                cache.Add(keycode, email, policyuser);
+            }
+            try
+            {
+                eventLogBot.WriteEntry("PutEmailInCache. keycode=" + keycode + ", command=" + email);
             }
             catch { }
         }
