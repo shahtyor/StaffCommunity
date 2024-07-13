@@ -643,7 +643,7 @@ namespace StaffCommunity
 
                                             UpdateCommandInCache(userid.Value, "preset");
                                         }
-                                        else if (string.IsNullOrEmpty(user.Email))
+                                        else if (Properties.Settings.Default.VerifyEmail && string.IsNullOrEmpty(user.Email))
                                         {
                                             await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + "!");
                                             await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
@@ -678,10 +678,16 @@ namespace StaffCommunity
                                     var codeverify = Methods.GenCodeForVerify(message.Chat.Id);
                                     PutCodeInCache(userid.Value, codeverify);
                                     PutEmailInCache(userid.Value, email);
-                                    Methods.SendEmailWithCode(email, codeverify);
-
-                                    UpdateCommandInCache(userid.Value, "entercode");
-                                    await botClient.SendTextMessageAsync(message.Chat, "We have sent a verification code by email. Check your mail from Staff Airlines and enter the code sent");
+                                    var MailError = Methods.SendEmailWithCode(email, codeverify);
+                                    if (string.IsNullOrEmpty(MailError))
+                                    {
+                                        UpdateCommandInCache(userid.Value, "entercode");
+                                        await botClient.SendTextMessageAsync(message.Chat, "We have sent a verification code by email. Check your mail from Staff Airlines and enter the code sent");
+                                    }
+                                    else
+                                    {
+                                        await botClient.SendTextMessageAsync(message.Chat, MailError);
+                                    }
                                 }
                                 else
                                 {
@@ -765,7 +771,16 @@ namespace StaffCommunity
                                         "\"event_properties\":{\"bot\":\"ab\"}}]";
                                     var r = Methods.AmplitudePOST(DataJson);
 
-                                    await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + ac.ToUpper() + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
+                                    if (Properties.Settings.Default.VerifyEmail && string.IsNullOrEmpty(user.Email))
+                                    {
+                                        await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + ac.ToUpper() + ")");
+                                        await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
+                                        UpdateCommandInCache(userid.Value, "enteremail");
+                                    }
+                                    else
+                                    {
+                                        await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + ac.ToUpper() + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
+                                    }
                                 }
                                 else
                                 {

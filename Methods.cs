@@ -80,6 +80,8 @@ namespace StaffCommunity
                             //var PT = new ProfileTokens();
                             string new_ac = PT?.OwnAC ?? "??";
 
+                            eventLogBot.WriteEntry("GetProfile: " + JsonConvert.SerializeObject(PT));
+
                             RemoveTelegramId(GetUserID(token), id);
 
                             if (reader.Read())
@@ -169,7 +171,7 @@ namespace StaffCommunity
                                 com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_requestor", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = false });
                                 com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = GetUserID(token) });
 
-                                eventLogBot.WriteEntry(com2.CommandText);
+                                eventLogBot.WriteEntry("insert into telegram_user (id, first_use, own_ac, is_reporter, is_requestor, id_user) values (" + id + ", " + DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss") + ", " + new_ac + ", false, false, " + GetUserID(token) + ")");
 
                                 try
                                 {
@@ -566,8 +568,9 @@ namespace StaffCommunity
             return irnd.ToString().PadLeft(6, '0');
         }
 
-        public static void SendEmailWithCode(string email, string code)
+        public static string SendEmailWithCode(string email, string code)
         {
+            string result = "";
             try
             {
                 SmtpClient mySmtpClient = new SmtpClient("mail.post.bz", 25);
@@ -604,13 +607,16 @@ namespace StaffCommunity
             }
             catch (SmtpException ex)
             {
-                throw new ApplicationException
-                  ("SmtpException has occured: " + ex.Message);
+                result = "SmtpException has occured: " + ex.Message;
+                //throw new ApplicationException
+                //  ("SmtpException has occured: " + ex.Message);
             }
             catch (Exception ex)
             {
-                throw ex;
+                result = "Exception has occured: " + ex.Message;
+                //throw ex;
             }
+            return result;
         }
 
        /* public static void SendEmailWithCode2(string email, string code)
