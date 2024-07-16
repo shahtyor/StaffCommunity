@@ -143,7 +143,7 @@ namespace StaffCommunity
                                     "\"user_properties\":{\"customerID\":\"" + token.type + "_" + token.id_user + "\",\"ac\":\"" + new_ac + "\"}}]";
                                 r2 = AmplitudePOST(DataJson2);
 
-                                if (new_ac != "??")
+                                if (new_ac != "??" && !string.IsNullOrEmpty(user.Nickname) && !string.IsNullOrEmpty(user.Email))
                                 {
                                     UpdateAirlinesReporter(new_ac, AirlineAction.Add);
                                 }
@@ -195,10 +195,10 @@ namespace StaffCommunity
                                     "\"user_properties\":{\"customerID\":\"" + GetUserID(token) + "\",\"ac\":\"" + new_ac + "\"}}]";
                                 r2 = AmplitudePOST(DataJson2);
 
-                                if (new_ac != "??")
+                                /*if (new_ac != "??")
                                 {
                                     UpdateAirlinesReporter(new_ac, AirlineAction.Add);
-                                }
+                                }*/
 
                                 user = new telegram_user() { id = id, first_use = DateTime.Now, own_ac = new_ac, is_reporter = false, is_requestor = false, Token = token };
                             }
@@ -230,6 +230,7 @@ namespace StaffCommunity
             bool valueReporter = false;
             if (!string.IsNullOrEmpty(user.own_ac) && user.own_ac != "??" && !string.IsNullOrEmpty(user.Email))
             {
+                UpdateAirlinesReporter(user.own_ac, AirlineAction.Add);
                 valueReporter = true;
             }
 
@@ -277,6 +278,7 @@ namespace StaffCommunity
             bool valueReporter = false;
             if (!string.IsNullOrEmpty(user.own_ac) && user.own_ac != "??" && !string.IsNullOrEmpty(user.Nickname))
             {
+                UpdateAirlinesReporter(user.own_ac, AirlineAction.Add);
                 valueReporter = true;
             }
 
