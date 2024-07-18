@@ -99,10 +99,10 @@ namespace StaffCommunity
                                 reader.Dispose();
                                 com.Dispose();
 
+                                bool valueReporter = false;
                                 if (!user.is_reporter || iid != id)
                                 {
-                                    bool valueReporter = false;
-                                    if (new_ac != "??" && !string.IsNullOrEmpty(user.Nickname))
+                                    if (new_ac != "??" && !string.IsNullOrEmpty(user.Nickname) && !string.IsNullOrEmpty(user.Email))
                                     {
                                         valueReporter = true;
 
@@ -135,7 +135,7 @@ namespace StaffCommunity
                                 // отправляем событие «успешная линковка» в амплитуд
                                 string DataJson2 = "[{\"user_id\":\"" + GetUserID(token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg link profile\"," +
                                     "\"event_properties\":{\"bot\":\"ab\",\"system\":\"" + (token.type == 1 ? "apple" : "google") + "\"}," +
-                                    "\"user_properties\":{\"id_telegram\":" + id + ",\"is_agent\":\"yes\",\"ac\":\"" + new_ac + "\"}}]";
+                                    "\"user_properties\":{\"id_telegram\":" + id + ",\"is_agent\":\"" + (valueReporter ? "yes" : "no") + "\",\"ac\":\"" + new_ac + "\"}}]";
                                 var r2 = AmplitudePOST(DataJson2);
 
                                 DataJson2 = "[{\"user_id\":\"" + id + "\",\"platform\":\"Telegram\",\"event_type\":\"tg link profile\"," +
@@ -154,7 +154,7 @@ namespace StaffCommunity
                                 reader.Dispose();
                                 com.Dispose();
 
-                                if (new_ac != "??" && !string.IsNullOrEmpty(user.Nickname))
+                                if (new_ac != "??" && !string.IsNullOrEmpty(user.Nickname) && !string.IsNullOrEmpty(user.Email))
                                 {
                                     // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
                                     string DataJson = "[{\"user_id\":\"" + GetUserID(token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg new agent\"," +
@@ -187,7 +187,7 @@ namespace StaffCommunity
                                 // отправляем событие «успешная линковка» в амплитуд
                                 string DataJson2 = "[{\"user_id\":\"" + token.type + "_" + token.id_user + "\",\"platform\":\"Telegram\",\"event_type\":\"tg link profile\"," +
                                     "\"event_properties\":{\"bot\":\"ab\",\"system\":\"" + (token.type == 1 ? "apple" : "google") + "\"}," +
-                                    "\"user_properties\":{\"id_telegram\":" + id + ",\"is_agent\":\"yes\",\"ac\":\"" + new_ac + "\"}}]";
+                                    "\"user_properties\":{\"id_telegram\":" + id + ",\"is_agent\":\"no\",\"ac\":\"" + new_ac + "\"}}]";
                                 var r2 = AmplitudePOST(DataJson2);
 
                                 DataJson2 = "[{\"user_id\":\"" + id + "\",\"platform\":\"Telegram\",\"event_type\":\"tg link profile\"," +

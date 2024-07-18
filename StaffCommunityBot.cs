@@ -444,11 +444,11 @@ namespace StaffCommunity
                                 }
                                 else if (Properties.Settings.Default.VerifyEmail && string.IsNullOrEmpty(user.Email))
                                 {
-                                    await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
-
-                                    // отправляем событие error code
+                                    // отправляем событие tg agent verification start
                                     string DataJson00 = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification start\"}]";                                        
                                     var r00 = Methods.AmplitudePOST(DataJson00);
+
+                                    await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
 
                                     UpdateCommandInCache(userid.Value, "enteremail");
                                 }
@@ -620,51 +620,60 @@ namespace StaffCommunity
 
                             if (comm == "enternick" && user.Token != null && !string.IsNullOrEmpty(messageText))
                             {
-                                var NickAvail = Methods.NickAvailable(messageText, Methods.GetUserID(user.Token));
-
-                                if (NickAvail)
+                                string[] messageWords = messageText.ToLower().Split(' ');
+                                if (messageWords[0] != "start")
                                 {
-                                    var alertnick = Methods.SetNickname(messageText, user);
+                                    var NickAvail = Methods.NickAvailable(messageText, Methods.GetUserID(user.Token));
 
-                                    if (string.IsNullOrEmpty(alertnick))
+                                    if (NickAvail)
                                     {
-                                        user.Nickname = messageText;
-                                        UpdateUserInCache(user);
-                                        cache.Remove("User" + message.Chat.Id);
+                                        var alertnick = Methods.SetNickname(messageText, user);
 
-                                        string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg set agent nick\"," +
-                                            "\"user_properties\":{\"nick\":\"" + user.Nickname + "\"}}]";
-                                        var r = Methods.AmplitudePOST(DataJson);
-
-                                        if (user.own_ac == "??")
+                                        if (string.IsNullOrEmpty(alertnick))
                                         {
-                                            await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + "!");
-                                            await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code (for example: AA):");
+                                            user.Nickname = messageText;
+                                            UpdateUserInCache(user);
+                                            cache.Remove("User" + message.Chat.Id);
 
-                                            UpdateCommandInCache(userid.Value, "preset");
-                                        }
-                                        else if (Properties.Settings.Default.VerifyEmail && string.IsNullOrEmpty(user.Email))
-                                        {
-                                            await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + "!");
-                                            await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
-                                            UpdateCommandInCache(userid.Value, "enteremail");
+                                            string DataJson = "[{\"user_id\":\"" + idus + "\",\"platform\":\"Telegram\",\"event_type\":\"tg set agent nick\"," +
+                                                "\"user_properties\":{\"nick\":\"" + user.Nickname + "\"}}]";
+                                            var r = Methods.AmplitudePOST(DataJson);
+
+                                            if (user.own_ac == "??")
+                                            {
+                                                await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + "!");
+                                                await botClient.SendTextMessageAsync(message.Chat, "Airline: " + user.own_ac + Environment.NewLine + "Specify your airline. Enter your airline's code (for example: AA):");
+
+                                                UpdateCommandInCache(userid.Value, "preset");
+                                            }
+                                            else if (Properties.Settings.Default.VerifyEmail && string.IsNullOrEmpty(user.Email))
+                                            {
+                                                await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + "!");
+                                                await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
+
+                                                // отправляем событие tg agent verification start
+                                                string DataJson00 = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification start\"}]";
+                                                var r00 = Methods.AmplitudePOST(DataJson00);
+
+                                                UpdateCommandInCache(userid.Value, "enteremail");
+                                            }
+                                            else
+                                            {
+                                                //await botClient.SendTextMessageAsync(message.Chat, "Agent is online. Waiting for requests...");
+                                                string nameac = Methods.TestAC(user.own_ac);
+                                                await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
+
+                                            }
                                         }
                                         else
                                         {
-                                            //await botClient.SendTextMessageAsync(message.Chat, "Agent is online. Waiting for requests...");
-                                            string nameac = Methods.TestAC(user.own_ac);
-                                            await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
-
+                                            await botClient.SendTextMessageAsync(message.Chat, alertnick);
                                         }
                                     }
                                     else
                                     {
-                                        await botClient.SendTextMessageAsync(message.Chat, alertnick);
+                                        await botClient.SendTextMessageAsync(message.Chat, "This nickname is already in use by another agent. Please choose another one:");
                                     }
-                                }
-                                else
-                                {
-                                    await botClient.SendTextMessageAsync(message.Chat, "This nickname is already in use by another agent. Please choose another one:");
                                 }
 
                                 return;
@@ -682,6 +691,11 @@ namespace StaffCommunity
                                     if (string.IsNullOrEmpty(MailError))
                                     {
                                         UpdateCommandInCache(userid.Value, "entercode");
+
+                                        // отправляем событие tg agent verification work email
+                                        string DataJson00 = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification work email\"}]";
+                                        var r00 = Methods.AmplitudePOST(DataJson00);
+
                                         await botClient.SendTextMessageAsync(message.Chat, "We have sent a verification code by email. Check your mail from Staff Airlines and enter the code sent");
                                     }
                                     else
