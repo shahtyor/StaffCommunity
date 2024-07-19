@@ -687,7 +687,7 @@ namespace StaffCommunity
                                     var codeverify = Methods.GenCodeForVerify(message.Chat.Id);
                                     PutCodeInCache(userid.Value, codeverify);
                                     PutEmailInCache(userid.Value, email);
-                                    var MailError = Methods.SendEmailWithCode(email, codeverify);
+                                    var MailError = Methods.SendEmailWithCode(email, codeverify, user);
                                     if (string.IsNullOrEmpty(MailError))
                                     {
                                         UpdateCommandInCache(userid.Value, "entercode");
@@ -789,6 +789,11 @@ namespace StaffCommunity
                                     {
                                         await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + ac.ToUpper() + ")");
                                         await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account. We will send a verification code. We ask you to provide your email for verification purposes only. We do not save it and it will not be used anywhere in the future.");
+
+                                        // отправляем событие tg agent verification start
+                                        string DataJson00 = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification start\"}]";
+                                        var r00 = Methods.AmplitudePOST(DataJson00);
+
                                         UpdateCommandInCache(userid.Value, "enteremail");
                                     }
                                     else

@@ -93,7 +93,17 @@ namespace StaffCommunity
                                     iid = long.Parse(sid);
                                 }
 
-                                user = new telegram_user() { id = id, first_use = (DateTime)reader["first_use"], own_ac = (new_ac == "??" ? reader["own_ac"].ToString() : new_ac), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"], Token = token, Nickname = reader["nickname"].ToString(), Email = reader["email"].ToString() };
+                                var bd_ac = reader["own_ac"].ToString();
+                                if (string.IsNullOrEmpty(bd_ac))
+                                {
+                                    bd_ac = "??";
+                                }
+
+                                eventLogBot.WriteEntry("ProfileCommand. reader.Read. own_ac: " + bd_ac);
+
+                                user = new telegram_user() { id = id, first_use = (DateTime)reader["first_use"], own_ac = (bd_ac == "??" ? new_ac : bd_ac), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"], Token = token, Nickname = reader["nickname"].ToString(), Email = reader["email"].ToString() };
+
+                                eventLogBot.WriteEntry("ProfileCommand. reader.Read. user: " + JsonConvert.SerializeObject(user));
 
                                 reader.Close();
                                 reader.Dispose();
@@ -109,14 +119,14 @@ namespace StaffCommunity
                                         // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
                                         string DataJson = "[{\"user_id\":\"" + GetUserID(token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg new agent\"," +
                                             "\"user_properties\":{\"is_agent\":\"yes\"," +
-                                            "\"ac\":\"" + new_ac + "\", \"nick\":\"" + user.Nickname + "\"}}]";
+                                            "\"ac\":\"" + user.own_ac + "\", \"nick\":\"" + user.Nickname + "\"}}]";
                                         var r = AmplitudePOST(DataJson);
                                     }
 
                                     NpgsqlCommand com3 = new NpgsqlCommand("update telegram_user set is_reporter=@is_reporter, id=@id, own_ac=@own_ac where id_user=@id_user", connP);
                                     com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = id });
                                     com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = valueReporter });
-                                    com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "own_ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = new_ac });
+                                    com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "own_ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = user.own_ac });
                                     com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = GetUserID(token) });
 
                                     eventLogBot.WriteEntry(com3.CommandText);
@@ -135,17 +145,17 @@ namespace StaffCommunity
                                 // отправляем событие «успешная линковка» в амплитуд
                                 string DataJson2 = "[{\"user_id\":\"" + GetUserID(token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg link profile\"," +
                                     "\"event_properties\":{\"bot\":\"ab\",\"system\":\"" + (token.type == 1 ? "apple" : "google") + "\"}," +
-                                    "\"user_properties\":{\"id_telegram\":" + id + ",\"is_agent\":\"" + (valueReporter ? "yes" : "no") + "\",\"ac\":\"" + new_ac + "\"}}]";
+                                    "\"user_properties\":{\"id_telegram\":" + id + ",\"is_agent\":\"" + (valueReporter ? "yes" : "no") + "\",\"ac\":\"" + user.own_ac + "\"}}]";
                                 var r2 = AmplitudePOST(DataJson2);
 
                                 DataJson2 = "[{\"user_id\":\"" + id + "\",\"platform\":\"Telegram\",\"event_type\":\"tg link profile\"," +
                                     "\"event_properties\":{\"bot\":\"ab\",\"system\":\"" + (token.type == 1 ? "apple" : "google") + "\"}," +
-                                    "\"user_properties\":{\"customerID\":\"" + token.type + "_" + token.id_user + "\",\"ac\":\"" + new_ac + "\"}}]";
+                                    "\"user_properties\":{\"customerID\":\"" + token.type + "_" + token.id_user + "\",\"ac\":\"" + user.own_ac + "\"}}]";
                                 r2 = AmplitudePOST(DataJson2);
 
-                                if (new_ac != "??" && !string.IsNullOrEmpty(user.Nickname) && !string.IsNullOrEmpty(user.Email))
+                                if (user.own_ac != "??" && !string.IsNullOrEmpty(user.Nickname) && !string.IsNullOrEmpty(user.Email))
                                 {
-                                    UpdateAirlinesReporter(new_ac, AirlineAction.Add);
+                                    UpdateAirlinesReporter(user.own_ac, AirlineAction.Add);
                                 }
                             }
                             else
@@ -570,7 +580,7 @@ namespace StaffCommunity
             return irnd.ToString().PadLeft(6, '0');
         }
 
-        public static string SendEmailWithCode(string email, string code)
+        public static string SendEmailWithCode(string email, string code, telegram_user user)
         {
             string result = "";
             try
@@ -618,6 +628,39 @@ namespace StaffCommunity
                 result = "Exception has occured: " + ex.Message;
                 //throw ex;
             }
+
+            // отправляем событие tg agent verification work email
+            string DataJson00 = "[{\"user_id\":\"" + GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification code sent\"}]";
+            var r00 = AmplitudePOST(DataJson00);
+
+            using (NpgsqlConnection connP = new NpgsqlConnection(Properties.Settings.Default.ConnectionString))
+            {
+                connP.Open();
+
+                var mesfordb = "";
+                var stack = "";
+                if (string.IsNullOrEmpty(result))
+                {
+                    mesfordb = email + " - " + code;
+                    stack = "Success!";
+                }
+                else
+                {
+                    mesfordb = email + " - " + code;
+                    stack = result;
+                }
+
+                NpgsqlCommand com = new NpgsqlCommand("insert into errors (method, message, stack, ts) values ('SendEmailWithCode', @message, @stack, @ts)", connP);
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "message", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = mesfordb });
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "stack", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = stack });
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "ts", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Timestamp, Value = DateTime.Now });
+
+                com.ExecuteNonQuery();
+                com.Dispose();
+
+                connP.Close();
+            }
+
             return result;
         }
 
@@ -837,7 +880,7 @@ namespace StaffCommunity
             string id_user = GetUserID(user.Token);
 
             bool valueReporter = false;
-            if (!string.IsNullOrEmpty(user.Nickname))
+            if (!string.IsNullOrEmpty(user.Nickname) && !string.IsNullOrEmpty(user.Email))
             {
                 valueReporter = true;
             }
@@ -857,7 +900,7 @@ namespace StaffCommunity
                 conn.Dispose();
             }
 
-            if (!user.is_reporter)
+            if (!user.is_reporter && valueReporter)
             {
                 // отправляем событие «когда создаем новую запись в таблице пользователей телеги с is agent = true, или проставляем для существующей записи is agent = true (в обоих случаях должна быть указана а/к пользователя, должен быть линк с профилем и указан ник)» в амплитуд
                 string DataJson = "[{\"user_id\":\"" + id_user + "\",\"platform\":\"Telegram\",\"event_type\":\"tg new agent\"," +
