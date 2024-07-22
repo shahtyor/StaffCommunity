@@ -350,7 +350,7 @@ namespace StaffCommunity
                         "This bot is special tool for agents. Agents — airline employees who can provide accurate flight load data to help their colleagues use SA benefits." + Environment.NewLine +
                         "To get started, you need to link your Telegram account with your profile in the Staff Airlines app. After this, you will receive requests from users for your airline's flights. " +
                         "For each answer you will receive a reward - 1 token. " +
-                        "You can use the received tokens for your requests in the Staff Airlines app or in Staff Airlines Search telegram bot (@StaffAirlinesSearchBot). Or you can purchase a premium subscription Staff Airlines with the <b>/sub</b> command." + Environment.NewLine +
+                        "You can use the received tokens for your requests in the Staff Airlines app. Or you can purchase a premium subscription Staff Airlines with the <b>/sub</b> command." + Environment.NewLine +
                         "Premium subscription cost:" + Environment.NewLine +
                         Properties.Settings.Default.TokensFor_1_month_sub + " tokens for 1 month." + Environment.NewLine +
                         Properties.Settings.Default.TokensFor_1_week_sub + " tokens for 1 week." + Environment.NewLine +
@@ -359,7 +359,8 @@ namespace StaffCommunity
                         "<b>/sub</b> purchase Premium subscription" + Environment.NewLine +
                         "<b>/nick</b> change your nickname" + Environment.NewLine +
                         "<b>/airline</b> change your airline" + Environment.NewLine +
-                        "<b>/help</b> description of all commands";
+                        "<b>/help</b> description of all commands" + Environment.NewLine +
+                        "<b>/balance</b> balance of tokens on the account";
 
                     try
                     {
@@ -504,6 +505,19 @@ namespace StaffCommunity
 
                                 UpdateCommandInCache(userid.Value, "enternick");
 
+                                return;
+                            }
+                            else if (message?.Text.ToLower() == "/balance")
+                            {
+                                if (user == null || user.Token == null)
+                                {
+                                    await botClient.SendTextMessageAsync(message.Chat, "To view the balance, you need to log in (/profile)");
+                                }
+                                else
+                                {
+                                    var ProfTok = Methods.GetProfile(Methods.GetUserID(user.Token)).Result;
+                                    await botClient.SendTextMessageAsync(message.Chat, "Your balance: " + (ProfTok.NonSubscribeTokens + ProfTok.SubscribeTokens) + " token(s)");                                    
+                                }
                                 return;
                             }
                             else if (message?.Text?.ToLower() == "/sub")
@@ -910,7 +924,7 @@ namespace StaffCommunity
                                     //при направлении клиенту сообщения с данными по загрузке от агента
                                     string plat = req.Source == 0 ? "telegram" : "app";
                                     string DataJson = "[{\"user_id\":\"" + req.Id_requestor + "\",\"platform\":\"Telegram\",\"event_type\":\"tg user agent answer message\"," +
-                                        "\"event_properties\":{\"platform\":\"" + plat + "\",\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"agent\":\"" + Methods.GetUserID(user.Token) + "\",\"nick\":\"" + user.Nickname + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
+                                        "\"event_properties\":{\"platform\":\"" + plat + "\",\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"agent\":\"" + Methods.GetUserID(user.Token) + "\",\"nick\":\"" + user.Nickname + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + ",\"economy\":" + req.Economy_count.Value + ",\"business\":" + req.Business_count.Value + ",\"sa\":" + req.SA_count.Value + "}}]";
                                     var r = Methods.AmplitudePOST(DataJson);
 
                                     var Coll = await Methods.CredToken(Methods.GetUserID(user.Token));
