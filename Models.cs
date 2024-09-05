@@ -277,6 +277,12 @@ namespace StaffCommunity
         public string Error { get; set; }
     }
 
+    public class CurrentTime
+    {
+        public DateTime Time { get; set; }
+        public DateTime TimeServer { get; set; }
+    }
+
     public class ProfileTokens
     {
         public int SubscribeTokens { get; set; }

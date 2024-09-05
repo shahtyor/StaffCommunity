@@ -38,5 +38,23 @@
     <Setting Name="VerifyEmail" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
+    <Setting Name="Timeout_D1" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">3</Value>
+    </Setting>
+    <Setting Name="Timeout_T1" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">1</Value>
+    </Setting>
+    <Setting Name="Timeout_D2" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">24</Value>
+    </Setting>
+    <Setting Name="Timeout_T2" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">2</Value>
+    </Setting>
+    <Setting Name="Timeout_T3" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">4</Value>
+    </Setting>
+    <Setting Name="FirebaseJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)">F:\SaeRest\SaeRest\safire.json</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

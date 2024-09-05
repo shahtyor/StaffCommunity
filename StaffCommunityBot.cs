@@ -1,23 +1,14 @@
-﻿using Newtonsoft.Json.Linq;
-using System;
-using System.Collections;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
-using System.Diagnostics.Metrics;
-using System.Linq;
 using System.Runtime.Caching;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Security.Policy;
-using System.Security.Principal;
 using System.ServiceProcess;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
-using Telegram.Bot.Requests.Abstractions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -73,9 +64,6 @@ namespace StaffCommunity
             }
             eventLogBot.Source = "StaffCommunity";
             eventLogBot.Log = "StaffCommunityLog";
-
-            //Methods.conn.Open();
-            Methods.connProc.Open();
         }
 
         protected override void OnStart(string[] args)
@@ -105,7 +93,7 @@ namespace StaffCommunity
 
                 aTimer.Elapsed += new ElapsedEventHandler(this.OnTimedEvent);
 
-                aTimer.Interval = 60000;
+                aTimer.Interval = 60000;       // 60000!!!
                 aTimer.Enabled = true;
                 aTimer.Start();
 
@@ -346,7 +334,7 @@ namespace StaffCommunity
                         }
                     }
 
-                    var ruleText = "Welcome to the Staff Airlines, agents!" + Environment.NewLine +
+                    /*var ruleText0 = "Welcome to the Staff Airlines, agents!" + Environment.NewLine +
                         "This bot is special tool for agents. Agents — airline employees who can provide accurate flight load data to help their colleagues use SA benefits." + Environment.NewLine +
                         "To get started, you need to link your Telegram account with your profile in the Staff Airlines app. After this, you will receive requests from users for your airline's flights. " +
                         "For each answer you will receive a reward - 1 token. " +
@@ -360,7 +348,21 @@ namespace StaffCommunity
                         "<b>/nick</b> change your nickname" + Environment.NewLine +
                         "<b>/airline</b> change your airline" + Environment.NewLine +
                         "<b>/help</b> description of all commands" + Environment.NewLine +
-                        "<b>/balance</b> balance of tokens on the account";
+                        "<b>/balance</b> balance of tokens on the account";*/
+                    var ruleText = "Welcome to Staff Airlines, agent!" + Environment.NewLine +
+                        "This bot is a special tool for agents.Agents are airline employees who share flight load data with their colleagues and help them maximize the benefits of staff travel." + Environment.NewLine + Environment.NewLine +
+                        "To get started, you need to link your Telegram account to your Staff Airlines app profile.Once you've linked your profile, you'll be ready to accept requests from app users for flights on the airline you represent." + Environment.NewLine + Environment.NewLine +
+                        "Earned tokens can be spent on load requests from other agents in the Staff Airlines app or exchanged for a premium subscription using the / sub command." + Environment.NewLine + Environment.NewLine +
+                        "The cost of premium subscription:" + Environment.NewLine +
+                        Properties.Settings.Default.TokensFor_1_month_sub + " tokens for 1 month." + Environment.NewLine +
+                        Properties.Settings.Default.TokensFor_1_week_sub + " tokens for 1 week." + Environment.NewLine +
+                        Properties.Settings.Default.TokensFor_3_day_sub + " tokens for 3 days." + Environment.NewLine + Environment.NewLine +
+                        "Bot commands:" + Environment.NewLine +
+                        "<b>/sub</b> Exchange tokens for premium subscription" + Environment.NewLine +
+                        "<b>/nick</b> Change nickname" + Environment.NewLine +
+                        "<b>/airline</b> Change airline" + Environment.NewLine +
+                        "<b>/help</b> Help with bot commands" + Environment.NewLine +
+                        "<b>/balance</b> Check token balance";
 
                     try
                     {
@@ -449,7 +451,7 @@ namespace StaffCommunity
                                     string DataJson00 = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification start\"}]";                                        
                                     var r00 = Methods.AmplitudePOST(DataJson00);
 
-                                    await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account");
+                                    await botClient.SendTextMessageAsync(message.Chat, "Enter your corporate email to verify your account");
 
                                     UpdateCommandInCache(userid.Value, "enteremail");
                                 }
@@ -506,6 +508,10 @@ namespace StaffCommunity
                                 UpdateCommandInCache(userid.Value, "enternick");
 
                                 return;
+                            }
+                            else if (message?.Text?.ToLower() ==  "/pushfcm")
+                            {
+                                Methods.SendPushNotification("fXkf6sAPQDy3u4Ge4gO_qT:APA91bHDO82EoM_sBaj7XuY1U8jKwOnd0rxTb_Z4sWw1sRT5LgowylxTd5VFUl0XHkxhsOQNbPVnpj7Zq6EUPXzTPmKLys-0B5hYzCu6QnBPE_p2rjYQKY5d6WmYv9s79UazYkqWSwEv", "sub", "message", "AF", "1234", "BER", "PAR", DateTime.Now, 2);
                             }
                             else if (message?.Text.ToLower() == "/balance")
                             {
@@ -663,7 +669,7 @@ namespace StaffCommunity
                                             else if (Properties.Settings.Default.VerifyEmail && string.IsNullOrEmpty(user.Email))
                                             {
                                                 await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + "!");
-                                                await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account");
+                                                await botClient.SendTextMessageAsync(message.Chat, "Enter your corporate email to verify your account");
 
                                                 // отправляем событие tg agent verification start
                                                 string DataJson00 = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification start\"}]";
@@ -718,7 +724,6 @@ namespace StaffCommunity
                                     }*/
                                     Methods.SaveEmail(email, user);
 
-                                    user.Email = email;
                                     UpdateUserInCache(user);
 
                                     cache.Remove("User" + message.Chat.Id);
@@ -729,8 +734,8 @@ namespace StaffCommunity
                                 }
                                 else
                                 {
-                                    await botClient.SendTextMessageAsync(message.Chat, "Looks like this is not a work email");
-                                }
+                                    await botClient.SendTextMessageAsync(message.Chat, "Looks like it's not corporate email. Public email services (gmail, yahoo, aol, outlook, etc.) are not allowed for agent registration." + Environment.NewLine + "Enter your corporate email to verify your account");
+                                } 
 
                                 return;
                             }
@@ -771,7 +776,7 @@ namespace StaffCommunity
                                     var r = Methods.AmplitudePOST(DataJson);
 
                                     await botClient.SendTextMessageAsync(message.Chat, "The code is invalid or has expired");
-                                    await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account");
+                                    await botClient.SendTextMessageAsync(message.Chat, "Enter your corporate email to verify your account");
 
                                     UpdateCommandInCache(userid.Value, "enteremail");
                                 }
@@ -812,7 +817,7 @@ namespace StaffCommunity
                                     if (Properties.Settings.Default.VerifyEmail && string.IsNullOrEmpty(user.Email))
                                     {
                                         await botClient.SendTextMessageAsync(message.Chat, "Airline: " + nameac + " (" + ac.ToUpper() + ")");
-                                        await botClient.SendTextMessageAsync(message.Chat, "Enter your work email to verify your account");
+                                        await botClient.SendTextMessageAsync(message.Chat, "Enter your corporate email to verify your account");
 
                                         // отправляем событие tg agent verification start
                                         string DataJson00 = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent verification start\"}]";
@@ -1273,28 +1278,34 @@ namespace StaffCommunity
                     {
                         Methods.UserBlockChat(userid.Value, AirlineAction.Delete, user);
 
+                        cache.Remove("User" + userid.Value);
+
+                        if (user.is_reporter)
+                        {
+                            //пользователь покинул агентский бот
+                            string DataJson = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg left agent\"," +
+                                "\"user_properties\":{\"is_agent\":\"no\"}," +
+                                "\"event_properties\":{\"ac\":\"" + user.own_ac + "\"}}]";
+                            var r = Methods.AmplitudePOST(DataJson);
+
+                            if (user.own_ac != "??")
+                            {
+                                Methods.UpdateAirlinesReporter(user.own_ac, AirlineAction.Delete);
+                            }
+                        }
+
                         user.is_reporter = false;
                         UpdateUserInCache(user);
 
-                        //пользователь покинул агентский бот
-                        string DataJson = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg left agent\"," +
-                            "\"user_properties\":{\"is_agent\":\"no\"}," +
-                            "\"event_properties\":{\"ac\":\"" + user.own_ac + "\"}}]";
-                        var r = Methods.AmplitudePOST(DataJson);
-
-                        if (user.own_ac != "??")
-                        {
-                            Methods.UpdateAirlinesReporter(user.own_ac, AirlineAction.Delete);
-                        }
                     }
                     else if (CM.Status == ChatMemberStatus.Member) // Разблокировал чат
                     {
                         Methods.UserBlockChat(userid.Value, AirlineAction.Add, user);
 
-                        user.is_reporter = true;
+                        //user.is_reporter = true;
                         UpdateUserInCache(user);
 
-                        if (user.own_ac != "??")
+                        if (user.is_reporter && user.own_ac != "??")
                         {
                             Methods.UpdateAirlinesReporter(user.own_ac, AirlineAction.Add);
                         }
@@ -1390,7 +1401,7 @@ namespace StaffCommunity
         public static async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
         {
             // Некоторые действия
-            Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(exception));
+            eventLogBot.WriteEntry(Newtonsoft.Json.JsonConvert.SerializeObject(exception));
         }
 
         protected override void OnStop()

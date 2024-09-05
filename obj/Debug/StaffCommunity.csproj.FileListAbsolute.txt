@@ -48,3 +48,14 @@ F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCommunity.csproj.CoreCompileInpu
 F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCom.61823235.Up2Date
 F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCommunity.exe
 F:\StaffCommunity\StaffCommunity\obj\Debug\StaffCommunity.pdb
+F:\StaffCommunity\StaffCommunity\bin\Debug\Google.Apis.Auth.dll
+F:\StaffCommunity\StaffCommunity\bin\Debug\Google.Apis.Core.dll
+F:\StaffCommunity\StaffCommunity\bin\Debug\Google.Apis.dll
+F:\StaffCommunity\StaffCommunity\bin\Debug\System.CodeDom.dll
+F:\StaffCommunity\StaffCommunity\bin\Debug\Google.Apis.pdb
+F:\StaffCommunity\StaffCommunity\bin\Debug\Google.Apis.xml
+F:\StaffCommunity\StaffCommunity\bin\Debug\Google.Apis.Auth.pdb
+F:\StaffCommunity\StaffCommunity\bin\Debug\Google.Apis.Auth.xml
+F:\StaffCommunity\StaffCommunity\bin\Debug\Google.Apis.Core.pdb
+F:\StaffCommunity\StaffCommunity\bin\Debug\Google.Apis.Core.xml
+F:\StaffCommunity\StaffCommunity\bin\Debug\System.CodeDom.xml

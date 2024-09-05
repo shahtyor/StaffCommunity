@@ -12,7 +12,7 @@ namespace StaffCommunity.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.9.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.11.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -165,6 +165,78 @@ namespace StaffCommunity.Properties {
             }
             set {
                 this["VerifyEmail"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("3")]
+        public int Timeout_D1 {
+            get {
+                return ((int)(this["Timeout_D1"]));
+            }
+            set {
+                this["Timeout_D1"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        public int Timeout_T1 {
+            get {
+                return ((int)(this["Timeout_T1"]));
+            }
+            set {
+                this["Timeout_T1"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("24")]
+        public int Timeout_D2 {
+            get {
+                return ((int)(this["Timeout_D2"]));
+            }
+            set {
+                this["Timeout_D2"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2")]
+        public int Timeout_T2 {
+            get {
+                return ((int)(this["Timeout_T2"]));
+            }
+            set {
+                this["Timeout_T2"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("4")]
+        public int Timeout_T3 {
+            get {
+                return ((int)(this["Timeout_T3"]));
+            }
+            set {
+                this["Timeout_T3"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("F:\\SaeRest\\SaeRest\\safire.json")]
+        public string FirebaseJson {
+            get {
+                return ((string)(this["FirebaseJson"]));
+            }
+            set {
+                this["FirebaseJson"] = value;
             }
         }
     }
