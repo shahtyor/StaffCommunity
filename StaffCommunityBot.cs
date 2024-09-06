@@ -511,7 +511,11 @@ namespace StaffCommunity
                             }
                             else if (message?.Text?.ToLower() ==  "/pushfcm")
                             {
-                                Methods.SendPushNotification("fXkf6sAPQDy3u4Ge4gO_qT:APA91bHDO82EoM_sBaj7XuY1U8jKwOnd0rxTb_Z4sWw1sRT5LgowylxTd5VFUl0XHkxhsOQNbPVnpj7Zq6EUPXzTPmKLys-0B5hYzCu6QnBPE_p2rjYQKY5d6WmYv9s79UazYkqWSwEv", "sub", "message", "AF", "1234", "BER", "PAR", DateTime.Now, 2);
+                                await botClient.SendTextMessageAsync(message.Chat, "Specify your device token:");
+
+                                UpdateCommandInCache(userid.Value, "enterfcm");
+
+                                return;
                             }
                             else if (message?.Text.ToLower() == "/balance")
                             {
@@ -780,6 +784,18 @@ namespace StaffCommunity
 
                                     UpdateCommandInCache(userid.Value, "enteremail");
                                 }
+
+                                return;
+                            }
+
+                            if (comm == "enterfcm")
+                            {
+                                var fcmtoken = messageText;
+
+                                Methods.SendPushNotification(fcmtoken, "sub", "message", "XX", "000", "AAA", "BBB", DateTime.Now, 1);
+
+                                await botClient.SendTextMessageAsync(message.Chat, "Sent!");
+                                cache.Remove("User" + message.Chat.Id);
 
                                 return;
                             }
