@@ -264,6 +264,7 @@ namespace StaffCommunity
                         eventLogBot.WriteEntry("auto cancel1 request id=" + req.Id);
                         if (urep.id != null)
                         {
+                            cache.Remove("User" + urep.id);
                             await bot.SendTextMessageAsync(new ChatId(urep.id.Value), "You didn't respond to the request in time!");
                         }
                     }
