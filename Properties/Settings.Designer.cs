@@ -38,18 +38,6 @@ namespace StaffCommunity.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("http://dev-api.staffairlines.com:8033/api")]
-        public string UrlApi {
-            get {
-                return ((string)(this["UrlApi"]));
-            }
-            set {
-                this["UrlApi"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("6457417713:AAFrqt3BSYdQy3-w73SAXKvrMXGy8btoJ0E")]
         public string BotToken {
             get {
@@ -230,13 +218,37 @@ namespace StaffCommunity.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("F:\\SaeRest\\SaeRest\\safire.json")]
+        [global::System.Configuration.DefaultSettingValueAttribute("http://localhost:8880/api")]
+        public string UrlApi {
+            get {
+                return ((string)(this["UrlApi"]));
+            }
+            set {
+                this["UrlApi"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("F:\\SAEwork\\FIREBASE\\safire.json")]
         public string FirebaseJson {
             get {
                 return ((string)(this["FirebaseJson"]));
             }
             set {
                 this["FirebaseJson"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("64fdg9@w")]
+        public string ServiceKey {
+            get {
+                return ((string)(this["ServiceKey"]));
+            }
+            set {
+                this["ServiceKey"] = value;
             }
         }
     }

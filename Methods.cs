@@ -13,6 +13,8 @@ using System.Net.Http.Headers;
 using System.Net.Mail;
 using System.Runtime.Caching;
 using System.Threading.Tasks;
+using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 
 namespace StaffCommunity
 {
@@ -1078,6 +1080,20 @@ namespace StaffCommunity
                 }
                 else
                 {
+                    if (status == 5)
+                    {
+                        NpgsqlCommand com0 = new NpgsqlCommand("select count(*) from telegram_request where id_reporter=@id_reporter and request_status=5", conn);
+                        com0.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_reporter", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = req.Id_reporter });
+                        int cnt = int.Parse(com0.ExecuteScalar().ToString()) + 1;
+                        com0.Dispose();
+
+                        NpgsqlCommand com1 = new NpgsqlCommand("update telegram_user set cnt_request=@cnt_request, last_request=now() where id_user=@id_user", conn);
+                        com1.Parameters.Add(new NpgsqlParameter() { ParameterName = "cnt_request", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Integer, Value = cnt });
+                        com1.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Varchar, Value = req.Id_reporter });
+                        com1.ExecuteNonQuery();
+                        com1.Dispose();
+                    }
+
                     NpgsqlCommand com = new NpgsqlCommand("update telegram_request set request_status=@status, ts_change=now() where id=@id", conn);
                     com.Parameters.Add(new NpgsqlParameter() { ParameterName = "status", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Smallint, Value = status });
                     com.Parameters.Add(new NpgsqlParameter() { ParameterName = "id", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Bigint, Value = req.Id });

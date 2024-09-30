@@ -5,9 +5,6 @@
     <Setting Name="ConnectionString" Type="System.String" Scope="User">
       <Value Profile="(Default)">Server = localhost; Port = 5432; User Id = postgres; Password = e4r5t6; Database = sae</Value>
     </Setting>
-    <Setting Name="UrlApi" Type="System.String" Scope="User">
-      <Value Profile="(Default)">http://dev-api.staffairlines.com:8033/api</Value>
-    </Setting>
     <Setting Name="BotToken" Type="System.String" Scope="User">
       <Value Profile="(Default)">6457417713:AAFrqt3BSYdQy3-w73SAXKvrMXGy8btoJ0E</Value>
     </Setting>
@@ -53,8 +50,14 @@
     <Setting Name="Timeout_T3" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">4</Value>
     </Setting>
+    <Setting Name="UrlApi" Type="System.String" Scope="User">
+      <Value Profile="(Default)">http://localhost:8880/api</Value>
+    </Setting>
     <Setting Name="FirebaseJson" Type="System.String" Scope="User">
-      <Value Profile="(Default)">F:\SaeRest\SaeRest\safire.json</Value>
+      <Value Profile="(Default)">F:\SAEwork\FIREBASE\safire.json</Value>
+    </Setting>
+    <Setting Name="ServiceKey" Type="System.String" Scope="User">
+      <Value Profile="(Default)">64fdg9@w</Value>
     </Setting>
   </Settings>
 </SettingsFile>

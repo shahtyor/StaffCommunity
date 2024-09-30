@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Npgsql;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.Caching;
@@ -208,6 +209,30 @@ namespace StaffCommunity
             catch (Exception ex) 
             {
                 eventLogBot.WriteEntry("Processing error: " + ex.Message + "..." + ex.StackTrace);
+            }
+        }
+
+        private static async void SendMessageForAgents(string message)
+        {
+            using (NpgsqlConnection conn = new NpgsqlConnection(Properties.Settings.Default.ConnectionString))
+            {
+                conn.Open();
+
+                NpgsqlCommand com = new NpgsqlCommand("select * from telegram_user where is_reporter=true and block=false and id is not null", conn);
+                NpgsqlDataReader reader = com.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    var sid = reader["id"].ToString();
+                    long iid = long.Parse(sid);
+
+                    await bot.SendTextMessageAsync(new ChatId(iid), message, null, ParseMode.Html);
+                }
+                reader.Close();
+                reader.Dispose();
+                com.Dispose();
+                conn.Close();
+                conn.Dispose();
             }
         }
 
@@ -518,7 +543,15 @@ namespace StaffCommunity
 
                                 return;
                             }
-                            else if (message?.Text.ToLower() == "/balance")
+                            else if (message?.Text?.ToLower() == "/com" + Properties.Settings.Default.ServiceKey)
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat, "Enter a message for the agents:");
+
+                                UpdateCommandInCache(userid.Value, "entermsg");
+
+                                return;
+                            }
+                            else if (message?.Text?.ToLower() == "/balance")
                             {
                                 if (user == null || user.Token == null)
                                 {
@@ -576,7 +609,11 @@ namespace StaffCommunity
                         {
                             eventLogBot.WriteEntry("comm: " + comm);
 
-                            var messageText = message.Text.Replace("/", "");
+                            string messageText = message.Text.Replace("/", "");
+                            if (comm == "entermsg")
+                            {
+                                messageText = message.Text;
+                            }
 
                             if (comm == "entertoken" && !string.IsNullOrEmpty(messageText))
                             {
@@ -801,6 +838,18 @@ namespace StaffCommunity
                                 return;
                             }
 
+                            if (comm == "entermsg")
+                            {
+                                var messageForAgents = messageText;
+
+                                SendMessageForAgents(messageText);
+
+                                await botClient.SendTextMessageAsync(message.Chat, "Sent!");
+                                cache.Remove("User" + message.Chat.Id);
+
+                                return;
+                            }
+
                             if (comm == "preset")
                             {
                                 //eventLogBot.WriteEntry("command preset");
@@ -950,6 +999,11 @@ namespace StaffCommunity
                                     var r = Methods.AmplitudePOST(DataJson);
 
                                     var Coll = await Methods.CredToken(Methods.GetUserID(user.Token));
+
+                                    if (!string.IsNullOrEmpty(Coll.Error))
+                                    {
+                                        eventLogBot.WriteEntry("CredToken error: " + Coll.Error, EventLogEntryType.Error);
+                                    }
 
                                     await botClient.SendTextMessageAsync(message.Chat, "Tokens accrued: " + Coll.DebtNonSubscribeTokens + Environment.NewLine + "Your balance: " + (Coll.SubscribeTokens + Coll.NonSubscribeTokens) + " token(s)");
                                 }
