@@ -218,7 +218,7 @@ namespace StaffCommunity
             {
                 conn.Open();
 
-                NpgsqlCommand com = new NpgsqlCommand("select * from telegram_user where is_reporter=true and block=false and id is not null", conn);
+                NpgsqlCommand com = new NpgsqlCommand("select * from telegram_user where is_reporter=true and block=false and for_message=true and id is not null", conn);
                 NpgsqlDataReader reader = com.ExecuteReader();
 
                 while (reader.Read())
@@ -1215,7 +1215,7 @@ namespace StaffCommunity
                                             },
                                         });
 
-                                        var tmes = await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "You have " + Properties.Settings.Default.TimeoutVoid + " minutes to respond:" + Environment.NewLine + Environment.NewLine + request.Desc_fligth, null, ParseMode.Html, replyMarkup: replyKeyboardMarkup);
+                                        var tmes = await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "You have " + Properties.Settings.Default.TimeoutProcess + " minutes to respond:" + Environment.NewLine + Environment.NewLine + request.Desc_fligth, null, ParseMode.Html, replyMarkup: replyKeyboardMarkup);
                                         Methods.SaveMessageParameters(tmes.Chat.Id, tmes.MessageId, id, 1);
                                         eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tmes.Chat.Id + ", MessageId=" + tmes.MessageId + ", req.Id=" + id + ", type=1");
 
