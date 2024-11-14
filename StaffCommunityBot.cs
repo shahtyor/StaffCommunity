@@ -226,6 +226,8 @@ namespace StaffCommunity
                     var sid = reader["id"].ToString();
                     long iid = long.Parse(sid);
 
+                    message = message.Replace("$id_telegram", sid);
+
                     await bot.SendTextMessageAsync(new ChatId(iid), message, null, ParseMode.Html);
                 }
                 reader.Close();
