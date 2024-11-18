@@ -214,27 +214,37 @@ namespace StaffCommunity
 
         private static async void SendMessageForAgents(string message)
         {
-            using (NpgsqlConnection conn = new NpgsqlConnection(Properties.Settings.Default.ConnectionString))
+            try
             {
-                conn.Open();
-
-                NpgsqlCommand com = new NpgsqlCommand("select * from telegram_user where is_reporter=true and block=false and for_message=true and id is not null", conn);
-                NpgsqlDataReader reader = com.ExecuteReader();
-
-                while (reader.Read())
+                using (NpgsqlConnection conn = new NpgsqlConnection(Properties.Settings.Default.ConnectionString))
                 {
-                    var sid = reader["id"].ToString();
-                    long iid = long.Parse(sid);
+                    conn.Open();
 
-                    message = message.Replace("$id_telegram", sid);
+                    NpgsqlCommand com = new NpgsqlCommand("select * from telegram_user where is_reporter=true and block=false and for_message=true and id is not null", conn);
+                    NpgsqlDataReader reader = com.ExecuteReader();
 
-                    await bot.SendTextMessageAsync(new ChatId(iid), message, null, ParseMode.Html);
+                    while (reader.Read())
+                    {
+                        var sid = reader["id"].ToString();
+
+                        long iid = long.Parse(sid);
+
+                        var mesreplaced = message.Replace("$id_telegram", sid);
+
+                        eventLogBot.WriteEntry("Message for agent: " + sid + ". " + mesreplaced);
+
+                        await bot.SendTextMessageAsync(new ChatId(iid), mesreplaced, null, ParseMode.Html);
+                    }
+                    reader.Close();
+                    reader.Dispose();
+                    com.Dispose();
+                    conn.Close();
+                    conn.Dispose();
                 }
-                reader.Close();
-                reader.Dispose();
-                com.Dispose();
-                conn.Close();
-                conn.Dispose();
+            }
+            catch (Exception ex)
+            {
+                eventLogBot.WriteEntry("SendMessageForAgents error: " + ex.Message + "..." + ex.StackTrace);
             }
         }
 
