@@ -233,7 +233,14 @@ namespace StaffCommunity
 
                         eventLogBot.WriteEntry("Message for agent: " + sid + ". " + mesreplaced);
 
-                        await bot.SendTextMessageAsync(new ChatId(iid), mesreplaced, null, ParseMode.Html);
+                        try
+                        {
+                            await bot.SendTextMessageAsync(new ChatId(iid), mesreplaced, null, ParseMode.Html);
+                        }
+                        catch (Exception ex0)
+                        {
+                            eventLogBot.WriteEntry("Message for agent " + sid + " error:" + ex0.Message);
+                        }
                     }
                     reader.Close();
                     reader.Dispose();
