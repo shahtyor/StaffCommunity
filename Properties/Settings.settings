@@ -59,5 +59,8 @@
     <Setting Name="ServiceKey" Type="System.String" Scope="User">
       <Value Profile="(Default)">64fdg9@w</Value>
     </Setting>
+    <Setting Name="PushAgent" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

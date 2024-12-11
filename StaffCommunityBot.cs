@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Timers;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
+using Telegram.Bot.Requests.Abstractions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -159,7 +160,7 @@ namespace StaffCommunity
 
                     eventLogBot.WriteEntry("Show request id=" + req.Id);
 
-                    var reporters = Methods.GetReporters(req.Operating);
+                    var reporters = Methods.GetReporters(req);
 
                     eventLogBot.WriteEntry("reporters=" + Newtonsoft.Json.JsonConvert.SerializeObject(reporters));
 
@@ -167,7 +168,7 @@ namespace StaffCommunity
 
                     if (!Properties.Settings.Default.AgentControl)
                     {
-                        repgroup = new ReporterGroup() { Main = reporters, Control = new List<long>() };
+                        repgroup = new ReporterGroup() { Main = reporters, Control = new List<AgentShort>() };
                     }
 
                     eventLogBot.WriteEntry("repgroup=" + Newtonsoft.Json.JsonConvert.SerializeObject(repgroup));
@@ -176,32 +177,43 @@ namespace StaffCommunity
                     {
                         foreach (var rep in repgroup.Main)
                         {
-                            Message tm = await bot.SendTextMessageAsync(new ChatId(rep), req.Desc_fligth, null, ParseMode.Html, replyMarkup: ikm);
-                            Methods.SaveMessageParameters(tm.Chat.Id, tm.MessageId, req.Id, 0);
+                            if (rep.id != null)
+                            {
+                                Message tm = await bot.SendTextMessageAsync(new ChatId(rep.id.Value), req.Desc_fligth, null, ParseMode.Html, replyMarkup: ikm);
+                                Methods.SaveMessageParameters(tm.Chat.Id, tm.MessageId, req.Id, 0);
 
-                            eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tm.Chat.Id + ", MessageId=" + tm.MessageId + ", req.Id=" + req.Id + ", type=0");
+                                eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tm.Chat.Id + ", MessageId=" + tm.MessageId + ", req.Id=" + req.Id + ", type=0");
 
-                            var agent = Methods.GetUser(rep);
+                                var agent = Methods.GetUser(rep.id.Value);
 
-                            //показали в чате агенту новый запрос
-                            string DataJson = "[{\"user_id\":\"" + Methods.GetUserID(agent.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent show request\"," +
-                                "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"version of request\":\"main\",\"requestor\":\"" + req.Id_requestor + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
-                            var r = Methods.AmplitudePOST(DataJson);
+                                //показали в чате агенту новый запрос
+                                string DataJson = "[{\"user_id\":\"" + Methods.GetUserID(agent.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent show request\"," +
+                                    "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"version of request\":\"main\",\"requestor\":\"" + req.Id_requestor + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
+                                var r = Methods.AmplitudePOST(DataJson);
+                            }
+                            if (!string.IsNullOrEmpty(rep.push_id) && Properties.Settings.Default.PushAgent)
+                            {
+                                var res = Methods.PushStatusRequest(req, "New request Staff Airlines Flight Club", TypePush.NewRequest, rep.push_id);
+                                eventLogBot.WriteEntry("Push. " + res);
+                            }
                         }
                     }
                     else
                     {
                         foreach (var rep in repgroup.Control)
                         {
-                            Message tm = await bot.SendTextMessageAsync(new ChatId(rep), req.Desc_fligth, null, ParseMode.Html, replyMarkup: ikm);
-                            Methods.SaveMessageParameters(tm.Chat.Id, tm.MessageId, req.Id, 0);
+                            if (string.IsNullOrEmpty(rep.push_id))
+                            {
+                                Message tm = await bot.SendTextMessageAsync(new ChatId(rep.id.Value), req.Desc_fligth, null, ParseMode.Html, replyMarkup: ikm);
+                                Methods.SaveMessageParameters(tm.Chat.Id, tm.MessageId, req.Id, 0);
 
-                            var agent = Methods.GetUser(rep);
+                                var agent = Methods.GetUser(rep.id.Value);
 
-                            //показали в чате агенту новый запрос
-                            string DataJson = "[{\"user_id\":\"" + Methods.GetUserID(agent.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent show request\"," +
-                                "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"version of request\":\"control\",\"requestor\":\"" + req.Id_requestor + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
-                            var r = Methods.AmplitudePOST(DataJson);
+                                //показали в чате агенту новый запрос
+                                string DataJson = "[{\"user_id\":\"" + Methods.GetUserID(agent.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent show request\"," +
+                                    "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"version of request\":\"control\",\"requestor\":\"" + req.Id_requestor + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
+                                var r = Methods.AmplitudePOST(DataJson);
+                            }
                         }
                     }
                 }
@@ -260,7 +272,6 @@ namespace StaffCommunity
             // type ready=0/cancel=1/take=2
             try
             {
-
                 var forcancel = Methods.SearchRequestsForCancel(type);
 
                 foreach (var req in forcancel)
@@ -272,7 +283,7 @@ namespace StaffCommunity
                         urep = Methods.GetUser(req.Id_reporter);
                     }
 
-                    List<long> replist = null;
+                    //List<AgentShort> replist = null;
 
                     short mhtype = 1;
                     short newstat = 3;
@@ -280,7 +291,7 @@ namespace StaffCommunity
                     {
                         mhtype = 0;
                         newstat = 6;
-                        replist = Methods.GetReporters(req.Operating);
+                      //  replist = Methods.GetReporters(req.Operating);
                     }
 
                     // Убираем сообщение с ready/cancel/take
@@ -336,12 +347,18 @@ namespace StaffCommunity
                     if (req.Source == 0)
                     {
                         var u = Methods.GetUser(req.Id_requestor);
-                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), mestext1);
+                        await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), mestext1); 
                     }
                     else
                     {
-                        var res = Methods.PushStatusRequest(req, mestext2);
+                        var res = Methods.PushStatusRequest(req, mestext2, TypePush.Result, null); 
                         eventLogBot.WriteEntry("Timeout. " + res);
+                    }
+
+                    if (!string.IsNullOrEmpty(urep.push_id) && Properties.Settings.Default.PushAgent)
+                    {
+                        var res = Methods.PushStatusRequest(req, "You didn't respond to the request in time", TypePush.Timeout, urep.push_id);
+                        eventLogBot.WriteEntry("Push. " + res);
                     }
                 }
             }
@@ -849,7 +866,7 @@ namespace StaffCommunity
                             {
                                 var fcmtoken = messageText;
 
-                                Methods.SendPushNotification(fcmtoken, "sub", "message", "XX", "000", "AAA", "BBB", DateTime.Now, 1);
+                                Methods.SendPushNotification(fcmtoken, "sub", "message", "XX", "000", "AAA", "BBB", DateTime.Now, 1, TypePush.Result);
 
                                 await botClient.SendTextMessageAsync(message.Chat, "Sent!");
                                 cache.Remove("User" + message.Chat.Id);
@@ -1002,7 +1019,7 @@ namespace StaffCommunity
 
                                     if (req.Source == 1)
                                     {
-                                        var res = Methods.PushStatusRequest(req, "Economy:" + req.Economy_count.Value + " Business:" + req.Business_count.Value + " SA:" + req.SA_count.Value + " (agent " + user.Nickname + " just reported this)");
+                                        var res = Methods.PushStatusRequest(req, "Economy:" + req.Economy_count.Value + " Business:" + req.Business_count.Value + " SA:" + req.SA_count.Value + " (agent " + user.Nickname + " just reported this)", TypePush.Result, null);
                                         eventLogBot.WriteEntry("Push. " + res);
                                     }
                                     else
@@ -1245,7 +1262,7 @@ namespace StaffCommunity
 
                                         if (request.Source == 1)
                                         {
-                                            var res = Methods.PushStatusRequest(request, "The request has been taken by " + user.Nickname);
+                                            var res = Methods.PushStatusRequest(request, "The request has been taken by " + user.Nickname, TypePush.Result, null);
                                             eventLogBot.WriteEntry("Push. " + res);
                                         }
                                         else
@@ -1293,7 +1310,7 @@ namespace StaffCommunity
 
                             if (request.Source == 1)
                             {
-                                var res = Methods.PushStatusRequest(request, "The agent " + user.Nickname + " refused to take your request!");
+                                var res = Methods.PushStatusRequest(request, "The agent " + user.Nickname + " refused to take your request!", TypePush.Result, null);
                                 eventLogBot.WriteEntry("Push. " + res);
                             }
                             else

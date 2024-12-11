@@ -348,7 +348,7 @@ namespace StaffCommunity
                         }
 
                         var id_user_arr = id_user.Split('_');
-                        user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), Email = reader["email"].ToString(), is_reporter = (bool)reader["is_reporter"], Token = new sign_in() { type = short.Parse(id_user_arr[0]), id_user = id_user_arr[1] } };
+                        user = new telegram_user() { id = iid, first_use = (DateTime)reader["first_use"], own_ac = reader["own_ac"].ToString(), Nickname = reader["nickname"].ToString(), Email = reader["email"].ToString(), is_reporter = (bool)reader["is_reporter"], Token = new sign_in() { type = short.Parse(id_user_arr[0]), id_user = id_user_arr[1] }, push_id = reader["push_id"].ToString() };
 
                         cache.Add(keyus, user, policyuser);
                     }
@@ -1191,20 +1191,32 @@ namespace StaffCommunity
             }
         }
 
-        public static List<long> GetReporters(string ac)
+        public static List<AgentShort> GetReporters(Request req)
         {
-            List<long> result = new List<long>();
+            List<AgentShort> result = new List<AgentShort>();
+
+            var mark = req.Number_flight.Substring(0, 2);
+
             using (NpgsqlConnection conn = new NpgsqlConnection(Properties.Settings.Default.ConnectionString))
             {
                 conn.Open();
 
-                NpgsqlCommand com = new NpgsqlCommand("select id from telegram_user where id is not null and is_reporter=true and own_ac=@ac and block=FALSE order by first_use", conn);
-                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = ac });
+                NpgsqlCommand com = new NpgsqlCommand("select id, push_id from telegram_user where id is not null and is_reporter=true and (own_ac=@ac or own_ac=@mark) and block=FALSE and on_pause=FALSE order by first_use", conn);
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = req.Operating });
+                com.Parameters.Add(new NpgsqlParameter() { ParameterName = "mark", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = mark });
                 using (NpgsqlDataReader reader = com.ExecuteReader())
                 {
                     while (reader.Read())
                     {
-                        result.Add((long)reader["id"]);
+                        var sid = reader["id"].ToString();
+                        var push = reader["push_id"].ToString();
+                        long? aid = null;
+                        if (!string.IsNullOrEmpty(sid))
+                        {
+                            aid = long.Parse(sid);
+                        }
+                        AgentShort agent = new AgentShort() { id = aid, push_id = push };
+                        result.Add(agent);
                     }
                 }
                 com.Dispose();
@@ -1215,9 +1227,9 @@ namespace StaffCommunity
             return result;
         }
 
-        public static ReporterGroup GetReporterGroup(List<long> all)
+        public static ReporterGroup GetReporterGroup(List<AgentShort> all)
         {
-            ReporterGroup result = new ReporterGroup() { Main = new List<long>(), Control = new List<long>() };
+            ReporterGroup result = new ReporterGroup() { Main = new List<AgentShort>(), Control = new List<AgentShort>() };
             if (all.Count <= 1)
             {
                 result.Main.Add(all[0]);
@@ -1381,17 +1393,17 @@ namespace StaffCommunity
             return await googleCredential.UnderlyingCredential.GetAccessTokenForRequestAsync().ConfigureAwait(false);
         }
 
-        public static string SendPushNotification(string deviceId, string sub, string message, string Marketing, string Number, string Origin, string Destination, DateTime DepartureTime, short pax)
+        public static string SendPushNotification(string deviceId, string sub, string message, string Marketing, string Number, string Origin, string Destination, DateTime DepartureTime, short pax, TypePush mode)
         {
-            var res = SendPushNotification0(deviceId, sub, message, Marketing, Number, Origin, Destination, DepartureTime, pax);
+            var res = SendPushNotification0(deviceId, sub, message, Marketing, Number, Origin, Destination, DepartureTime, pax, mode);
             if (res == "401")
             {
-                res = SendPushNotification0(deviceId, sub, message, Marketing, Number, Origin, Destination, DepartureTime, pax);
+                res = SendPushNotification0(deviceId, sub, message, Marketing, Number, Origin, Destination, DepartureTime, pax, mode);
             }
             return res;
         }
 
-        private static string SendPushNotification0(string deviceId, string sub, string message, string Marketing, string Number, string Origin, string Destination, DateTime DepartureTime, short pax)
+        private static string SendPushNotification0(string deviceId, string sub, string message, string Marketing, string Number, string Origin, string Destination, DateTime DepartureTime, short pax, TypePush mode)
         {
             string result = "";
             try
@@ -1405,32 +1417,67 @@ namespace StaffCommunity
                     FIREBASE_TOKEN = token;
                 }
 
+                string typetext = "agent";
+                if (mode == TypePush.NewRequest)
+                {
+                    typetext = "FCnewrequest";
+                }
+                else if (mode == TypePush.Timeout)
+                {
+                    typetext = "FCtimeoutrequest";
+                }
+
                 WebRequest tRequest = WebRequest.Create("https://fcm.googleapis.com/v1/projects/staff-airlines-a356e/messages:send");
 
                 tRequest.Method = "post";
                 tRequest.ContentType = "application/json";
-                object data = new
+
+                object data = null;
+
+                if (mode == TypePush.Result)
                 {
-                    message = new
+                    data = new
                     {
-                        token = deviceId,
-                        notification = new
+                        message = new
                         {
-                            title = Marketing + Number + " " + Origin + "-" + Destination + " " + DepartureTime.ToString("dd-MMM HH:mm"),
-                            body = sub + Environment.NewLine + message
-                        },
-                        data = new
-                        {
-                            type = "agent",
-                            origin = Origin,
-                            destination = Destination,
-                            departureDateTime = DepartureTime.ToString("yyyy-MM-ddTHH:mm:ss"),
-                            paxAmount = pax.ToString(),
-                            marketingCarrier = Marketing,
-                            flightNumber = Number
+                            token = deviceId,
+                            notification = new
+                            {
+                                title = Marketing + Number + " " + Origin + "-" + Destination + " " + DepartureTime.ToString("dd-MMM HH:mm"),
+                                body = sub + Environment.NewLine + message
+                            },
+                            data = new
+                            {
+                                type = typetext,
+                                origin = Origin,
+                                destination = Destination,
+                                departureDateTime = DepartureTime.ToString("yyyy-MM-ddTHH:mm:ss"),
+                                paxAmount = pax.ToString(),
+                                marketingCarrier = Marketing,
+                                flightNumber = Number
+                            }
                         }
-                    }
-                };
+                    };
+                }
+                else if (mode == TypePush.NewRequest || mode == TypePush.Timeout)
+                {
+                    data = new
+                    {
+                        message = new
+                        {
+                            token = deviceId,
+                            notification = new
+                            {
+                                title = message,
+                                body = Marketing + Number + " " + Origin + "-" + Destination + " " + DepartureTime.ToString("dd-MMM HH:mm"),
+                            },
+                            data = new
+                            {
+                                type = typetext
+                            }
+                        }
+                    };
+                }
 
                 string json = JsonConvert.SerializeObject(data);
                 Byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(json);
@@ -1479,7 +1526,7 @@ namespace StaffCommunity
             return result;
         }
 
-        public static string PushStatusRequest(Request req, string status)
+        public static string PushStatusRequest(Request req, string status, TypePush mode, string push_token)
         {
             var message = "";
             string subtitle = null;
@@ -1496,7 +1543,13 @@ namespace StaffCommunity
                 message = status;
             }
 
-            string result = SendPushNotification(req.Push_id, subtitle, message, req.Number_flight.Substring(0, 2), req.Number_flight.Substring(2), req.Origin, req.Destination, req.DepartureDateTime, req.Pax);
+            string tok = req.Push_id;
+            if (mode == TypePush.NewRequest || mode == TypePush.Timeout)
+            {
+                tok = push_token;
+            }
+
+            string result = SendPushNotification(tok, subtitle, message, req.Number_flight.Substring(0, 2), req.Number_flight.Substring(2), req.Origin, req.Destination, req.DepartureDateTime, req.Pax, mode);
             return result;
         }
 

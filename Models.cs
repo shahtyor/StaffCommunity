@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Web;
 
 namespace StaffCommunity
 {
@@ -16,6 +17,7 @@ namespace StaffCommunity
         public string Nickname { get; set; }
         public string Email { get; set; }
         public TokenCollection TokenSet { get; set; }
+        public string push_id { get; set; }
     }
 
     public class sign_in
@@ -62,6 +64,13 @@ namespace StaffCommunity
     {
         Add = 0,
         Delete = 1
+    }
+
+    public enum TypePush
+    {
+        NewRequest = 0,
+        Result = 1,
+        Timeout = 2
     }
 
     public class ExtendedResult
@@ -293,10 +302,16 @@ namespace StaffCommunity
         public string OwnAC { get; set; }
     }
 
+    public class AgentShort
+    {
+        public long? id { get; set; }
+        public string push_id { get; set; }
+    }
+
     public class ReporterGroup
     {
-        public List<long> Main { get; set; }
-        public List<long> Control { get; set; }
+        public List<AgentShort> Main { get; set; }
+        public List<AgentShort> Control { get; set; }
     }
 
     public enum ReportStatus

@@ -251,5 +251,17 @@ namespace StaffCommunity.Properties {
                 this["ServiceKey"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool PushAgent {
+            get {
+                return ((bool)(this["PushAgent"]));
+            }
+            set {
+                this["PushAgent"] = value;
+            }
+        }
     }
 }
