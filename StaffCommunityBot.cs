@@ -1,4 +1,5 @@
 ﻿using Npgsql;
+using Npgsql.Replication.PgOutput.Messages;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -61,8 +62,7 @@ namespace StaffCommunity
             eventLogBot = new EventLog();
             if (!EventLog.SourceExists("StaffCommunity"))
             {
-                EventLog.CreateEventSource(
-                    "StaffCommunity", "StaffCommunityLog");
+                EventLog.CreateEventSource("StaffCommunity", "StaffCommunityLog");
             }
             eventLogBot.Source = "StaffCommunity";
             eventLogBot.Log = "StaffCommunityLog";
@@ -78,7 +78,7 @@ namespace StaffCommunity
                 serviceStatus.dwWaitHint = 100000;
                 SetServiceStatus(this.ServiceHandle, ref serviceStatus);
 
-                eventLogBot.WriteEntry("Staff Community Bot --- OnStart");
+                eventLogBot.WriteEntry("Staff Community Bot --- OnStart", EventLogEntryType.Information);
 
                 // Update the service state to Running.
                 serviceStatus.dwCurrentState = ServiceState.SERVICE_RUNNING;
@@ -88,7 +88,7 @@ namespace StaffCommunity
                 if (task.IsCompleted)
                 {
                     var sfname = task.Result.FirstName;
-                    eventLogBot.WriteEntry("Запущен бот " + sfname);
+                    eventLogBot.WriteEntry("Запущен бот " + sfname, EventLogEntryType.Information);
                 }
 
                 System.Timers.Timer aTimer = new System.Timers.Timer();
@@ -114,7 +114,7 @@ namespace StaffCommunity
             }
             catch (Exception ex)
             {
-                eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace);
+                eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
             }
         }
 
@@ -127,13 +127,13 @@ namespace StaffCommunity
             }
             catch (Exception ex) 
             {
-                eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace);
+                eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
             }
         }
 
         public static async Task Processing()
         {
-            eventLogBot.WriteEntry("Processing: " + DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss"));
+            eventLogBot.WriteEntry("Processing: " + DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss"), EventLogEntryType.Information);
             Methods.SetActive();
 
             //Message msg = await bot.SendTextMessageAsync(new ChatId(5231676978), "test");
@@ -158,11 +158,11 @@ namespace StaffCommunity
                         },
                     });
 
-                    eventLogBot.WriteEntry("Show request id=" + req.Id);
+                    eventLogBot.WriteEntry("Show request id=" + req.Id, EventLogEntryType.Information);
 
                     var reporters = Methods.GetReporters(req);
 
-                    eventLogBot.WriteEntry("reporters=" + Newtonsoft.Json.JsonConvert.SerializeObject(reporters));
+                    eventLogBot.WriteEntry("req=" + req.Id + ". Reporters=" + Newtonsoft.Json.JsonConvert.SerializeObject(reporters), EventLogEntryType.Information);
 
                     var repgroup = Methods.GetReporterGroup(reporters);
 
@@ -171,10 +171,11 @@ namespace StaffCommunity
                         repgroup = new ReporterGroup() { Main = reporters, Control = new List<AgentShort>() };
                     }
 
-                    eventLogBot.WriteEntry("repgroup=" + Newtonsoft.Json.JsonConvert.SerializeObject(repgroup));
+                    //eventLogBot.WriteEntry("repgroup=" + Newtonsoft.Json.JsonConvert.SerializeObject(repgroup));
 
                     if (req.Version_request == 0)
                     {
+                        var mes01 = "Save telegram_history. req.Id=" + req.Id + ", type=0. Chat.Id-MessageId: ";
                         foreach (var rep in repgroup.Main)
                         {
                             if (rep.id != null)
@@ -182,7 +183,8 @@ namespace StaffCommunity
                                 Message tm = await bot.SendTextMessageAsync(new ChatId(rep.id.Value), req.Desc_fligth, null, ParseMode.Html, replyMarkup: ikm);
                                 Methods.SaveMessageParameters(tm.Chat.Id, tm.MessageId, req.Id, 0);
 
-                                eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tm.Chat.Id + ", MessageId=" + tm.MessageId + ", req.Id=" + req.Id + ", type=0");
+                                mes01 += tm.Chat.Id + "-" + tm.MessageId + ", ";
+                                //eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tm.Chat.Id + ", MessageId=" + tm.MessageId + ", req.Id=" + req.Id + ", type=0");
 
                                 var agent = Methods.GetUser(rep.id.Value);
 
@@ -194,9 +196,10 @@ namespace StaffCommunity
                             if (!string.IsNullOrEmpty(rep.push_id) && Properties.Settings.Default.PushAgent)
                             {
                                 var res = Methods.PushStatusRequest(req, "New request Staff Airlines Flight Club", TypePush.NewRequest, rep.push_id);
-                                eventLogBot.WriteEntry("Push. " + res);
+                                eventLogBot.WriteEntry("Push. " + res, EventLogEntryType.Information);
                             }
                         }
+                        eventLogBot.WriteEntry(mes01, EventLogEntryType.Information);
                     }
                     else
                     {
@@ -220,7 +223,7 @@ namespace StaffCommunity
             }
             catch (Exception ex) 
             {
-                eventLogBot.WriteEntry("Processing error: " + ex.Message + "..." + ex.StackTrace);
+                eventLogBot.WriteEntry("Processing error: " + ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
             }
         }
 
@@ -243,7 +246,7 @@ namespace StaffCommunity
 
                         var mesreplaced = message.Replace("$id_telegram", sid);
 
-                        eventLogBot.WriteEntry("Message for agent: " + sid + ". " + mesreplaced);
+                        eventLogBot.WriteEntry("Message for agent: " + sid + ". " + mesreplaced, EventLogEntryType.Information);
 
                         try
                         {
@@ -251,7 +254,7 @@ namespace StaffCommunity
                         }
                         catch (Exception ex0)
                         {
-                            eventLogBot.WriteEntry("Message for agent " + sid + " error:" + ex0.Message);
+                            eventLogBot.WriteEntry("Message for agent " + sid + " error:" + ex0.Message, EventLogEntryType.Error);
                         }
                     }
                     reader.Close();
@@ -263,7 +266,7 @@ namespace StaffCommunity
             }
             catch (Exception ex)
             {
-                eventLogBot.WriteEntry("SendMessageForAgents error: " + ex.Message + "..." + ex.StackTrace);
+                eventLogBot.WriteEntry("SendMessageForAgents error: " + ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
             }
         }
 
@@ -296,14 +299,20 @@ namespace StaffCommunity
 
                     // Убираем сообщение с ready/cancel/take
                     var mespar = Methods.GetMessageParameters(req.Id, mhtype);
+                    var mes02 = "DeleteMessage for req.Id=" + req.Id + ", type=" + mhtype + ". ChatId-MessageId: ";
                     foreach (var tm in mespar)
                     {
+                        mes02 += tm.ChatId + "-" + tm.MessageId + ", ";
                         try
                         {
                             await bot.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
                         }
-                        catch { }
+                        catch (Exception ee)
+                        {
+                            eventLogBot.WriteEntry("DeleteMessage Error. " + ee.Message + "..." + ee.StackTrace, EventLogEntryType.Error);
+                        }
                     }
+                    eventLogBot.WriteEntry(mes02, EventLogEntryType.Information);
                     Methods.DelMessageParameters(req.Id, mhtype);
 
                     Methods.SetRequestStatus(newstat, req);
@@ -312,11 +321,11 @@ namespace StaffCommunity
                     if (type == CancelType.Void)
                     {
                         rt = await Methods.ReturnToken(req);
-                        eventLogBot.WriteEntry("auto cancel2 request id=" + req.Id + " Return token. " + Newtonsoft.Json.JsonConvert.SerializeObject(rt));
+                        eventLogBot.WriteEntry("auto cancel2 request id=" + req.Id + " Return token. " + Newtonsoft.Json.JsonConvert.SerializeObject(rt), EventLogEntryType.Information);
                     }
                     else
                     {
-                        eventLogBot.WriteEntry("auto cancel1 request id=" + req.Id);
+                        eventLogBot.WriteEntry("auto cancel1 request id=" + req.Id, EventLogEntryType.Information);
                         if (urep.id != null)
                         {
                             cache.Remove("User" + urep.id);
@@ -352,25 +361,25 @@ namespace StaffCommunity
                     else
                     {
                         var res = Methods.PushStatusRequest(req, mestext2, TypePush.Result, null); 
-                        eventLogBot.WriteEntry("Timeout. " + res);
+                        eventLogBot.WriteEntry("Timeout. " + res, EventLogEntryType.Warning);
                     }
 
                     if (!string.IsNullOrEmpty(urep.push_id) && Properties.Settings.Default.PushAgent)
                     {
                         var res = Methods.PushStatusRequest(req, "You didn't respond to the request in time", TypePush.Timeout, urep.push_id);
-                        eventLogBot.WriteEntry("Push. " + res);
+                        eventLogBot.WriteEntry("Push. " + res, EventLogEntryType.Warning);
                     }
                 }
             }
             catch (Exception ex) 
             {
-                eventLogBot.WriteEntry("HideRequests Error. " + ex.Message + "..." + ex.StackTrace);
+                eventLogBot.WriteEntry("HideRequests Error. " + ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
             }
         }
 
         public static async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
-            eventLogBot.WriteEntry(Newtonsoft.Json.JsonConvert.SerializeObject(update));
+            eventLogBot.WriteEntry(Newtonsoft.Json.JsonConvert.SerializeObject(update), EventLogEntryType.Information);
 
             try
             {
@@ -643,7 +652,7 @@ namespace StaffCommunity
                         }
                         else
                         {
-                            eventLogBot.WriteEntry("comm: " + comm);
+                            eventLogBot.WriteEntry("comm: " + comm, EventLogEntryType.Information);
 
                             string messageText = message.Text.Replace("/", "");
                             if (comm == "entermsg")
@@ -760,7 +769,6 @@ namespace StaffCommunity
                                                 //await botClient.SendTextMessageAsync(message.Chat, "Agent is online. Waiting for requests...");
                                                 string nameac = Methods.TestAC(user.own_ac);
                                                 await botClient.SendTextMessageAsync(message.Chat, "Agent nickname: " + user.Nickname + Environment.NewLine + "Airline: " + nameac + " (" + user.own_ac + ")" + Environment.NewLine + "Agent is online. Waiting for requests...");
-
                                             }
                                         }
                                         else
@@ -829,7 +837,7 @@ namespace StaffCommunity
                                 var emailexist = cache.Contains(emailcode);
                                 if (emailexist) email33 = (string)cache.Get(emailcode);
 
-                                eventLogBot.WriteEntry("entercode. keycode=" + keycode + ", code=" + codecache + ", message=" + messageText);
+                                eventLogBot.WriteEntry("entercode. keycode=" + keycode + ", code=" + codecache + ", message=" + messageText, EventLogEntryType.Information);
 
                                 if (messageText == codecache)
                                 {
@@ -896,12 +904,12 @@ namespace StaffCommunity
                                 {
                                     try
                                     {
-                                        eventLogBot.WriteEntry("UpdateUserAC. " + ac.ToUpper() + "/" + user.own_ac.ToUpper() + "/" + message.Chat.Id);
+                                        eventLogBot.WriteEntry("UpdateUserAC. " + ac.ToUpper() + "/" + user.own_ac.ToUpper() + "/" + message.Chat.Id, EventLogEntryType.Information);
                                         Methods.UpdateUserAC(message.Chat.Id, ac.ToUpper(), user.own_ac.ToUpper(), user);
                                     }
                                     catch (Exception ex)
                                     {
-                                        eventLogBot.WriteEntry("UpdateUserAC. " + ac.ToUpper() + "/" + user.own_ac.ToUpper() + ". " + ex.Message + "..." + ex.StackTrace);
+                                        eventLogBot.WriteEntry("UpdateUserAC. " + ac.ToUpper() + "/" + user.own_ac.ToUpper() + ". " + ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
                                     }
                                     //var permitted = GetPermittedAC(ac.ToUpper());
                                     //var sperm = string.Join('-', permitted.Select(p => p.Permit));
@@ -945,7 +953,7 @@ namespace StaffCommunity
                             {
                                 var commwithpar = comm.Split('/');
 
-                                eventLogBot.WriteEntry("command ready1. id: " + commwithpar[1]);
+                                eventLogBot.WriteEntry("command ready1. id: " + commwithpar[1], EventLogEntryType.Information);
 
                                 short n;
                                 bool isNumeric = short.TryParse(messageText, out n);
@@ -957,7 +965,7 @@ namespace StaffCommunity
                                     }
                                     catch (Exception ex)
                                     {
-                                        eventLogBot.WriteEntry("SetCount: " + ex.Message + "..." + ex.StackTrace);
+                                        eventLogBot.WriteEntry("SetCount: " + ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
                                     }
 
                                     UpdateCommandInCache(message.Chat.Id, "ready2/" + commwithpar[1]);
@@ -1012,7 +1020,7 @@ namespace StaffCommunity
                                         "\"event_properties\":{\"ac\":\"" + req.Operating + "\",\"requestGroupID\":" + req.Id_group + ",\"version of request\":\"main\",\"requestor\":\"" + req.Id_requestor + "\",\"workTime\":" + Convert.ToInt32((DateTime.Now - req.TS_create).TotalSeconds) + "}}]";
                                     var r0 = Methods.AmplitudePOST(DataJson0);
 
-                                    eventLogBot.WriteEntry("finished request id=" + id_req);
+                                    eventLogBot.WriteEntry("finished request id=" + id_req, EventLogEntryType.Information);
                                     Methods.DelMessageParameters(id_req);
 
                                     await botClient.SendTextMessageAsync(message.Chat, req.Desc_fligth + Environment.NewLine + "Classes available: Economy:" + req.Economy_count.Value + " Business:" + req.Business_count.Value + " SA:" + req.SA_count.Value, null, ParseMode.Html);
@@ -1020,7 +1028,7 @@ namespace StaffCommunity
                                     if (req.Source == 1)
                                     {
                                         var res = Methods.PushStatusRequest(req, "Economy:" + req.Economy_count.Value + " Business:" + req.Business_count.Value + " SA:" + req.SA_count.Value + " (agent " + user.Nickname + " just reported this)", TypePush.Result, null);
-                                        eventLogBot.WriteEntry("Push. " + res);
+                                        eventLogBot.WriteEntry("Push. " + res, EventLogEntryType.Information);
                                     }
                                     else
                                     {
@@ -1038,7 +1046,7 @@ namespace StaffCommunity
 
                                     if (!string.IsNullOrEmpty(Coll.Error))
                                     {
-                                        eventLogBot.WriteEntry("CredToken error: " + Coll.Error, EventLogEntryType.Error);
+                                        eventLogBot.WriteEntry("CredToken error: " + Coll.Error, EventLogEntryType.Warning);
                                     }
 
                                     await botClient.SendTextMessageAsync(message.Chat, "Tokens accrued: " + Coll.DebtNonSubscribeTokens + Environment.NewLine + "Your balance: " + (Coll.SubscribeTokens + Coll.NonSubscribeTokens) + " token(s)");
@@ -1053,7 +1061,7 @@ namespace StaffCommunity
                     }
                     catch (Exception ex)
                     {
-                        eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace);
+                        eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
                     }
 
                     /*var command = message?.Text;
@@ -1089,7 +1097,7 @@ namespace StaffCommunity
                             }
                         }
 
-                        eventLogBot.WriteEntry(message + "..." + message.Substring(0, 5));
+                        eventLogBot.WriteEntry(message + "..." + message.Substring(0, 5), EventLogEntryType.Information);
 
                         if (message == "/set_air")
                         {
@@ -1197,7 +1205,7 @@ namespace StaffCommunity
                                 }
                                 catch (Exception ex)
                                 {
-                                    eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace);
+                                    eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
                                 }
 
                                 //eventLogBot.WriteEntry("TakeAvailable=" + ta.ToString());
@@ -1232,15 +1240,19 @@ namespace StaffCommunity
                                     {
                                         Methods.SetRequestStatus(2, id, Methods.GetUserID(user.Token));
                                         var mespar = Methods.GetMessageParameters(id, 0);
+                                        var mes03 = "DeleteMessage req.Id=" + id + ", type=0. ChatId-MessageId: ";
                                         foreach (TelMessage tm in mespar)
                                         {
+                                            mes03 += tm.ChatId + "-" + tm.MessageId + ", ";
                                             await botClient.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
-                                            eventLogBot.WriteEntry("DeleteMessege. ChatId=" + tm.ChatId + ", MessageId=" + tm.MessageId);
+                                            //eventLogBot.WriteEntry(" ChatId=" + tm.ChatId + ", MessageId=" + tm.MessageId);
                                         }
-                                        Methods.DelMessageParameters(id, 0);
-                                        eventLogBot.WriteEntry("DeleteMessege. ChatId=" + id + ", type=0");
+                                        eventLogBot.WriteEntry(mes03, EventLogEntryType.Information);
 
-                                        eventLogBot.WriteEntry("take request id=" + id);
+                                        Methods.DelMessageParameters(id, 0);
+                                        eventLogBot.WriteEntry("DeleteMessegeParameters. ChatId=" + id + ", type=0", EventLogEntryType.Information);
+
+                                        eventLogBot.WriteEntry("take request id=" + id, EventLogEntryType.Information);
 
                                         var replyKeyboardMarkup = new InlineKeyboardMarkup(new[]
                                         {
@@ -1253,7 +1265,7 @@ namespace StaffCommunity
 
                                         var tmes = await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "You have " + Properties.Settings.Default.TimeoutProcess + " minutes to respond:" + Environment.NewLine + Environment.NewLine + request.Desc_fligth, null, ParseMode.Html, replyMarkup: replyKeyboardMarkup);
                                         Methods.SaveMessageParameters(tmes.Chat.Id, tmes.MessageId, id, 1);
-                                        eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tmes.Chat.Id + ", MessageId=" + tmes.MessageId + ", req.Id=" + id + ", type=1");
+                                        eventLogBot.WriteEntry("Save telegram_history. Chat.Id=" + tmes.Chat.Id + ", MessageId=" + tmes.MessageId + ", req.Id=" + id + ", type=1", EventLogEntryType.Information);
 
                                         //агент взял запрос в работу
                                         string DataJson0 = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent take request\"," +
@@ -1263,12 +1275,12 @@ namespace StaffCommunity
                                         if (request.Source == 1)
                                         {
                                             var res = Methods.PushStatusRequest(request, "The request has been taken by " + user.Nickname, TypePush.Result, null);
-                                            eventLogBot.WriteEntry("Push. " + res);
+                                            eventLogBot.WriteEntry("Push. " + res, EventLogEntryType.Information);
                                         }
                                         else
                                         {
                                             var u = Methods.GetUser(request.Id_requestor);
-                                            eventLogBot.WriteEntry("GetUser. Id_requestor=" + request.Id_requestor + ", User=" + Newtonsoft.Json.JsonConvert.SerializeObject(u));
+                                            eventLogBot.WriteEntry("GetUser. Id_requestor=" + request.Id_requestor + ", User=" + Newtonsoft.Json.JsonConvert.SerializeObject(u), EventLogEntryType.Information);
                                             await botSearch.SendTextMessageAsync(new ChatId(u.id.Value), "The request " + request.Number_flight + " " + request.Origin + "-" + request.Destination + " at " + request.DepartureDateTime.ToString("dd-MM-yyyy HH:mm") + " has been taken by " + user.Nickname);
                                         }
 
@@ -1295,15 +1307,19 @@ namespace StaffCommunity
                             var r0 = Methods.AmplitudePOST(DataJson0);
 
                             var mespar = Methods.GetMessageParameters(id_request, 1);
+                            var mes04 = "Delete message req.Id=" + id_request + ", type=1. ChatId-MessageId: ";
                             foreach (TelMessage tm in mespar)
                             {
                                 await botClient.DeleteMessageAsync(new ChatId(tm.ChatId), tm.MessageId);
-                                eventLogBot.WriteEntry("DeleteMessege. ChatId=" + tm.ChatId + ", MessageId=" + tm.MessageId);
+                                //eventLogBot.WriteEntry("DeleteMessege. ChatId=" + tm.ChatId + ", MessageId=" + tm.MessageId);
+                                mes04 += tm.ChatId + "-" + tm.MessageId + ", ";
                             }
-                            Methods.DelMessageParameters(id_request, 1);
-                            eventLogBot.WriteEntry("DeleteMessege. ChatId=" + id_request + ", type=1");
+                            eventLogBot.WriteEntry(mes04, EventLogEntryType.Information);
 
-                            eventLogBot.WriteEntry("cancel request id=" + id_request);
+                            Methods.DelMessageParameters(id_request, 1);
+                            eventLogBot.WriteEntry("DeleteMessegeParameters. ChatId=" + id_request + ", type=1", EventLogEntryType.Information);
+
+                            eventLogBot.WriteEntry("cancel request id=" + id_request, EventLogEntryType.Information);
 
                             cache.Remove("User" + userid.Value);
                             await botClient.SendTextMessageAsync(callbackquery.Message.Chat, "Request has been canceled!");
@@ -1311,7 +1327,7 @@ namespace StaffCommunity
                             if (request.Source == 1)
                             {
                                 var res = Methods.PushStatusRequest(request, "The agent " + user.Nickname + " refused to take your request!", TypePush.Result, null);
-                                eventLogBot.WriteEntry("Push. " + res);
+                                eventLogBot.WriteEntry("Push. " + res, EventLogEntryType.Information);
                             }
                             else
                             {
@@ -1344,7 +1360,7 @@ namespace StaffCommunity
                                     await botClient.EditMessageReplyMarkupAsync(new ChatId(tm.ChatId), tm.MessageId, replyMarkup: null);
                                 }
 
-                                eventLogBot.WriteEntry("ready request id=" + id_request + ", User=" + userid.Value);
+                                eventLogBot.WriteEntry("ready request id=" + id_request + ", User=" + userid.Value, EventLogEntryType.Information);
 
                                 //агент готов вводить данные по загрузке
                                 string DataJson = "[{\"user_id\":\"" + Methods.GetUserID(user.Token) + "\",\"platform\":\"Telegram\",\"event_type\":\"tg agent ready request\"," +
@@ -1421,7 +1437,7 @@ namespace StaffCommunity
             }
             catch (Exception ex) 
             {
-                eventLogBot.WriteEntry("Exception: " + ex.Message + "..." + ex.StackTrace);
+                eventLogBot.WriteEntry("Exception: " + ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
                 return;
             }
         }
@@ -1440,7 +1456,7 @@ namespace StaffCommunity
             }
             try
             {
-                eventLogBot.WriteEntry("UpdateUserInCache. keyuser=" + keyuser + ". " + Newtonsoft.Json.JsonConvert.SerializeObject(user));
+                eventLogBot.WriteEntry("UpdateUserInCache. keyuser=" + keyuser + ". " + Newtonsoft.Json.JsonConvert.SerializeObject(user), EventLogEntryType.Information);
             }
             catch { }
         }
@@ -1460,7 +1476,7 @@ namespace StaffCommunity
             }
             try
             {
-                eventLogBot.WriteEntry("UpdateCommandInCache. keycommand=" + keycommand + ", command=" + command);
+                eventLogBot.WriteEntry("UpdateCommandInCache. keycommand=" + keycommand + ", command=" + command, EventLogEntryType.Information);
             }
             catch { }
         }
@@ -1480,7 +1496,7 @@ namespace StaffCommunity
             }
             try
             {
-                eventLogBot.WriteEntry("PutCodeInCache. keycode=" + keycode + ", command=" + code);
+                eventLogBot.WriteEntry("PutCodeInCache. keycode=" + keycode + ", command=" + code, EventLogEntryType.Information);
             }
             catch { }
         }
@@ -1500,7 +1516,7 @@ namespace StaffCommunity
             }
             try
             {
-                eventLogBot.WriteEntry("PutEmailInCache. keycode=" + keycode + ", command=" + email);
+                eventLogBot.WriteEntry("PutEmailInCache. keycode=" + keycode + ", command=" + email, EventLogEntryType.Information);
             }
             catch { }
         }
@@ -1508,13 +1524,13 @@ namespace StaffCommunity
         public static async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
         {
             // Некоторые действия
-            eventLogBot.WriteEntry(Newtonsoft.Json.JsonConvert.SerializeObject(exception));
+            eventLogBot.WriteEntry(Newtonsoft.Json.JsonConvert.SerializeObject(exception), EventLogEntryType.Error);
         }
 
         protected override void OnStop()
         {
             //Methods.conn.Close();
-            eventLogBot.WriteEntry("Staff Community Bot --- OnStop");
+            eventLogBot.WriteEntry("Staff Community Bot --- OnStop", EventLogEntryType.Information);
         }
 
         private static InlineKeyboardMarkup GetIkmSetAir(string own_ac)

@@ -40,12 +40,12 @@ namespace StaffCommunity
 
             if (token != null)
             {
-                eventLogBot.WriteEntry("GetToken: " + token.type + "/" + token.id_user);
+                eventLogBot.WriteEntry("GetToken: " + token.type + "/" + token.id_user, EventLogEntryType.Information);
 
                 var exist = TokenAlreadySet(token, id);
                 if (exist)
                 {
-                    eventLogBot.WriteEntry("These authorization parameters have already been assigned to another user!");
+                    eventLogBot.WriteEntry("These authorization parameters have already been assigned to another user!", EventLogEntryType.Warning);
 
                     message = "These authorization parameters have already been assigned to another user!";
                 }
@@ -64,7 +64,7 @@ namespace StaffCommunity
                             //var PT = new ProfileTokens();
                             string new_ac = PT?.OwnAC ?? "??";
 
-                            eventLogBot.WriteEntry("GetProfile: " + JsonConvert.SerializeObject(PT));
+                            eventLogBot.WriteEntry("GetProfile: " + JsonConvert.SerializeObject(PT), EventLogEntryType.Information);
 
                             RemoveTelegramId(GetUserID(token), id);
 
@@ -83,11 +83,11 @@ namespace StaffCommunity
                                     bd_ac = "??";
                                 }
 
-                                eventLogBot.WriteEntry("ProfileCommand. reader.Read. own_ac: " + bd_ac);
+                                eventLogBot.WriteEntry("ProfileCommand. reader.Read. own_ac: " + bd_ac, EventLogEntryType.Information);
 
                                 user = new telegram_user() { id = id, first_use = (DateTime)reader["first_use"], own_ac = (bd_ac == "??" ? new_ac : bd_ac), is_reporter = (bool)reader["is_reporter"], is_requestor = (bool)reader["is_requestor"], Token = token, Nickname = reader["nickname"].ToString(), Email = reader["email"].ToString() };
 
-                                eventLogBot.WriteEntry("ProfileCommand. reader.Read. user: " + JsonConvert.SerializeObject(user));
+                                eventLogBot.WriteEntry("ProfileCommand. reader.Read. user: " + JsonConvert.SerializeObject(user), EventLogEntryType.Information);
 
                                 reader.Close();
                                 reader.Dispose();
@@ -113,7 +113,7 @@ namespace StaffCommunity
                                     com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "own_ac", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Char, Value = user.own_ac });
                                     com3.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = GetUserID(token) });
 
-                                    eventLogBot.WriteEntry(com3.CommandText);
+                                    eventLogBot.WriteEntry(com3.CommandText, EventLogEntryType.Information);
 
                                     try
                                     {
@@ -121,7 +121,7 @@ namespace StaffCommunity
                                     }
                                     catch (Exception ex)
                                     {
-                                        eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace);
+                                        eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
                                     }
                                     com3.Dispose();
                                 }
@@ -165,7 +165,7 @@ namespace StaffCommunity
                                 com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "is_requestor", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Boolean, Value = false });
                                 com2.Parameters.Add(new NpgsqlParameter() { ParameterName = "id_user", NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = GetUserID(token) });
 
-                                eventLogBot.WriteEntry("insert into telegram_user (id, first_use, own_ac, is_reporter, is_requestor, id_user) values (" + id + ", " + DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss") + ", " + new_ac + ", false, false, " + GetUserID(token) + ")");
+                                eventLogBot.WriteEntry("insert into telegram_user (id, first_use, own_ac, is_reporter, is_requestor, id_user) values (" + id + ", " + DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss") + ", " + new_ac + ", false, false, " + GetUserID(token) + ")", EventLogEntryType.Information);
 
                                 try
                                 {
@@ -174,7 +174,7 @@ namespace StaffCommunity
                                 catch (Exception ex)
                                 {
                                     var e = ex.StackTrace;
-                                    eventLogBot.WriteEntry(ex.Message + "..." + e);
+                                    eventLogBot.WriteEntry(ex.Message + "..." + e, EventLogEntryType.Error);
                                 }
                                 com2.Dispose();
 
@@ -199,7 +199,7 @@ namespace StaffCommunity
                         }
                         catch (Exception ex)
                         {
-                            eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace);
+                            eventLogBot.WriteEntry(ex.Message + "..." + ex.StackTrace, EventLogEntryType.Error);
                         }
 
                         connP.Close();
@@ -209,7 +209,7 @@ namespace StaffCommunity
             }
             else
             {
-                eventLogBot.WriteEntry("A valid token was not found!");
+                eventLogBot.WriteEntry("A valid token was not found!", EventLogEntryType.Warning);
 
                 message = "A valid token was not found!";
             }
